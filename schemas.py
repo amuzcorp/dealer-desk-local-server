@@ -2,6 +2,9 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import Dict, Optional
 
+"""
+테이블 데이터
+"""
 class TableDataBase(BaseModel):
     table_title: str
     position: Dict[str, float] = {"x": 0, "y": 0}
@@ -19,6 +22,63 @@ class TableData(TableDataBase):
     id: Optional[int] = None
     current_player_count: int
     max_player_count: int
+    
+    class Config:
+        from_attributes = True 
+        
+        
+"""
+디바이스 데이터
+"""
+class DeviceDataBase(BaseModel):
+    id: Optional[int] = None
+    name: str
+    device_uid: str
+    
+class RequestDeviceDataCreate(DeviceDataBase):
+    pass
+
+class RequestDeviceDataUpdate(DeviceDataBase):
+    pass
+
+class AuthDeviceDataCreate(DeviceDataBase):
+    pass
+
+class AuthDeviceDataUpdate(DeviceDataBase):
+    pass
+
+class AuthDeviceData(DeviceDataBase):
+    is_connected: bool
+    connect_table_id: Optional[int] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True 
+
+class RequestDeviceData(DeviceDataBase):
+    connect_status: str
+    request_time: datetime
+    update_time: datetime
+    
+    class Config:
+        from_attributes = True 
+        
+        
+class PresetDataBase(BaseModel):
+    title: str
+    payment_chip: int
+    buyin_price: int
+    rebuyin_price: int
+    rebuyin_block: Dict[str, int]
+    addon: Dict[str, int]
+    prize_setting: Dict[str, int]
+    blind_setting: Dict[str, int]
+    
+class PresetDataCreate(PresetDataBase):
+    pass
+
+class PresetDataUpdate(PresetDataBase):
+    id: Optional[int] = None
     
     class Config:
         from_attributes = True 
