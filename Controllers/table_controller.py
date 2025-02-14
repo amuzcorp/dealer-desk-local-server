@@ -88,3 +88,4 @@ async def save_table(tables: List[schemas.TableData], db: Session = Depends(get_
             headers={"Content-Type": "application/json; charset=utf-8"},
             media_type="application/json"
         )
+ 

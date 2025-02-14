@@ -76,24 +76,28 @@ class PresetData(Base):
     __tablename__ = "preset_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index=True)
-    payment_chip = Column(Integer)
-    buyin_price = Column(Integer)
-    rebuyin_price = Column(Integer)
-    rebuyin_block = Column(JSON)
-    addon = Column(JSON)
-    prize_setting = Column(JSON)
-    blind_setting = Column(JSON)
-    
+    preset_name = Column(String, index=True)
+    time_table_data = Column(JSON)
+    buy_in_price = Column(Integer)
+    re_buy_in_price = Column(Integer)
+    starting_chip = Column(Integer)
+    rebuyin_payment_chips = Column(JSON)
+    rebuyin_number_limits = Column(JSON)
+    addon_data = Column(JSON)
+    prize_settings = Column(JSON)
+    rebuy_cut_off = Column(JSON)
+
     def to_json(self):
         return {
-            "id" : self.id,
-            "title" : self.title,
-            "payment_chip" : self.payment_chip,
-            "buyin_price" : self.buyin_price,
-            "rebuyin_price" : self.rebuyin_price,
-            "rebuyin_block" : self.rebuyin_block,
-            "addon" : self.addon,
-            "prize_setting" : self.prize_setting,
-            "blind_setting" : self.blind_setting
+            "id": self.id,
+            "preset_name": self.preset_name,
+            "time_table_data": self.time_table_data,
+            "buy_in_price": self.buy_in_price,
+            "re_buy_in_price": self.re_buy_in_price,
+            "starting_chip": self.starting_chip,
+            "rebuyin_payment_chips": self.rebuyin_payment_chips,
+            "rebuyin_number_limits": self.rebuyin_number_limits,
+            "addon_data": self.addon_data,
+            "prize_settings": self.prize_settings,
+            "rebuy_cut_off": self.rebuy_cut_off
         }

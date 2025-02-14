@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Dict, Optional, Any, List
 
 """
 테이블 데이터
@@ -80,5 +80,21 @@ class PresetDataCreate(PresetDataBase):
 class PresetDataUpdate(PresetDataBase):
     id: Optional[int] = None
     
+    class Config:
+        from_attributes = True 
+
+class PresetData(BaseModel):
+    id: Optional[int] = Field(default=-1)
+    preset_name: str
+    time_table_data: List[Dict[str, Any]]
+    buy_in_price: int
+    re_buy_in_price: int
+    starting_chip: int
+    rebuyin_payment_chips: List[Dict[str, Any]]
+    rebuyin_number_limits: Dict[str, Any]
+    addon_data: Dict[str, Any]
+    prize_settings: Dict[str, Any]
+    rebuy_cut_off: Dict[str, Any]
+
     class Config:
         from_attributes = True 

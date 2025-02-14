@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 import models, schemas, database
-from Controllers.table_controller import router as table_router
+from Controllers import table_controller, device_controller, preset_controller
 
 # 데이터베이스 테이블 생성
 models.Base.metadata.create_all(bind=database.engine)
@@ -23,7 +23,9 @@ app.add_middleware(
 )
 
 # 라우터 등록
-app.include_router(table_router)
+app.include_router(table_controller.router)
+app.include_router(device_controller.router)
+app.include_router(preset_controller.router)
 
 @app.get("/")
 async def root():
