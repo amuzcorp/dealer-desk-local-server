@@ -35,17 +35,6 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-@app.get("/auth_devices")
-async def get_auth_device(db: Session = Depends(database.get_db)):
-    auth_devices = db.query(models.AuthDeviceData).all()
-    return auth_devices
-
-@app.get("/request_devices")
-async def get_request_device(db: Session = Depends(database.get_db)):
-    request_devices = db.query(models.RequestDeviceData).all()
-    return request_devices
-
-
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

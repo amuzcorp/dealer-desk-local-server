@@ -32,7 +32,7 @@ class TableData(TableDataBase):
 """
 class DeviceDataBase(BaseModel):
     id: Optional[int] = None
-    name: str
+    device_name: str
     device_uid: str
     
 class RequestDeviceDataCreate(DeviceDataBase):
@@ -57,8 +57,8 @@ class AuthDeviceData(DeviceDataBase):
 
 class RequestDeviceData(DeviceDataBase):
     connect_status: str
-    request_time: datetime
-    update_time: datetime
+    request_time: Optional[datetime] = datetime.now()
+    update_time: Optional[datetime] = datetime.now()
     
     class Config:
         from_attributes = True 

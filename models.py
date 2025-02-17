@@ -56,7 +56,7 @@ class RequestDeviceData(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     device_uid = Column(String, index=True)
-    name = Column(String, index=True)
+    device_name = Column(String, index=True)
     connect_status = Column(String, index=True, default="waiting") # 대기, 승인, 거절
     request_time = Column(DateTime, default=datetime.now())
     update_time = Column(DateTime, default=datetime.now())
@@ -65,7 +65,7 @@ class RequestDeviceData(Base):
         return {
             "id" : self.id,
             "device_uid" : self.device_uid,
-            "name" : self.name,
+            "device_name" : self.device_name,
             "connect_status" : self.connect_status,
             "request_time" : self.request_time,
             "update_time" : self.update_time
@@ -101,3 +101,13 @@ class PresetData(Base):
             "prize_settings": self.prize_settings,
             "rebuy_cut_off": self.rebuy_cut_off
         }
+
+
+class GameData(Base):
+    __tablename__ = "game_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index = True)
+    
+    
+    # 게임 데이터는 프리셋 전체 데이터를 가짐     
