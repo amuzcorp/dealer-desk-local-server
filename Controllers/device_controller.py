@@ -9,16 +9,30 @@ from fastapi.encoders import jsonable_encoder
 import json
 import sys
 import os
+from dataclasses import dataclass
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import models
 import schemas
 from database import get_db
 
+@dataclass
+class DeviceNameChangeData:
+    device_uid: str
+    device_name: str
+    
+    def from_json(self, json_data: dict):
+        return DeviceNameChangeData(
+            device_uid=json_data["device_uid"],
+            device_name=json_data["device_name"]
+        )
+    
 router = APIRouter(
     prefix="/devices",
     tags=["devices"]
 )
+
+MAX_DEVICE_NAME_LENGTH = 20
 
 async def send_socket_message(websocket: WebSocket, response_code: int, data: any):
     """
@@ -30,6 +44,17 @@ async def send_socket_message(websocket: WebSocket, response_code: int, data: an
             "data": data
         })
     )
+
+async def update_auth_device_status(device_uid: str, is_connected: bool, db: Session):
+    try:
+        auth_device = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.device_uid == device_uid
+        ).first()
+        if auth_device:
+            auth_device.is_connected = is_connected
+            db.commit()
+    except Exception as e:
+        print(f"Error updating device status: {e}")
 
 @router.websocket("/ws") 
 async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
@@ -83,12 +108,22 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         
         await send_socket_message(websocket, 200, "connected")
         
+        if(auth_device):
+            await update_auth_device_status(auth_device.device_uid, True, db)
+             
         # 메시지 수신 대기
         while True:
             data = await websocket.receive_text()
             print(f"Received message: {data}")
+            
     except Exception as e:
         print(e)
+        auth_device = db.query(models.AuthDeviceData).filter(
+                models.AuthDeviceData.device_uid == device_data.device_uid
+            ).first()
+
+        if auth_device:
+            await update_auth_device_status(auth_device.device_uid, False, db)
 
 @router.get("/get-waiting-device")
 async def get_waiting_device(db: Session = Depends(get_db)):
@@ -120,11 +155,28 @@ async def get_waiting_device(db: Session = Depends(get_db)):
             content={"response": 500, "error": str(e)},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
-    
+
+@router.get("/get-auth-device")
+async def get_auth_device(db: Session = Depends(get_db)):
+    auth_device = db.query(models.AuthDeviceData).all()
+    auth_device_list = []
+    for device in auth_device:
+        device_json = device.to_json()
+        device_json["created_at"] = device_json["created_at"].isoformat()
+        auth_device_list.append(device_json)
+        
+    return JSONResponse(
+        content={"response": 200, "data": auth_device_list},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
 @router.post("/auth-device")
 async def auth_device(device_data: schemas.RequestDeviceData, db: Session = Depends(get_db)):
     # 요청된 디바이스 찾기
-    request_device = await get_waiting_device(device_data.device_uid, db);
+    request_device = db.query(models.RequestDeviceData).filter(
+        models.RequestDeviceData.device_uid == device_data.device_uid,
+        models.RequestDeviceData.connect_status == "waiting"
+    ).first()
     
     if not request_device:
         return JSONResponse(
@@ -166,22 +218,69 @@ async def auth_device(device_data: schemas.RequestDeviceData, db: Session = Depe
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
 
-async def auth_device(device_data: models.RequestDeviceData, db: Session = Depends(get_db)):
-    """
-    디바이스 인증 처리 함수
-    """
+@router.get("/get-waiting-device")
+async def get_waiting_device(db: Session = Depends(get_db)):
+    waiting_device = db.query(models.RequestDeviceData).filter(
+        models.RequestDeviceData.connect_status == "waiting"
+    ).all()
+    
+    if waiting_device:
+        device_list = []
+        for device in waiting_device:
+            device_json = device.to_json()
+            device_json["request_time"] = device_json["request_time"].isoformat()
+            device_json["update_time"] = device_json["update_time"].isoformat()
+            device_list.append(device_json)
+            
+        device_list.sort(key=lambda x: x["request_time"])
+            
+        return JSONResponse(
+            content={"response": 200, "data": device_list},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )    
+ 
+@router.post("/device-name-change")
+async def device_name_change(device_data: DeviceNameChangeData, db: Session = Depends(get_db)):
     auth_device = db.query(models.AuthDeviceData).filter(
         models.AuthDeviceData.device_uid == device_data.device_uid
     ).first()
     
-    if not auth_device:
-        db.add(device_data)
-        db.commit()
-        db.refresh(device_data)
+    if not auth_device: 
+        return JSONResponse(
+            content={"response": 404, "message": "Device not found"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    if len(device_data.device_name) > MAX_DEVICE_NAME_LENGTH:
+        return JSONResponse(
+            content={"response": 400, "message": "Device name is too long"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    auth_device.device_name = device_data.device_name
+    db.commit()
+    
+    return JSONResponse(
+        content={"response": 200, "message": "Device name changed successfully"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
 
-
-async def get_waiting_device(device_uid: str, db: Session = Depends(get_db)):
-    waiting_device = db.query(models.RequestDeviceData).filter(
-        models.RequestDeviceData.device_uid == device_uid
+@router.delete("/device-delete/{device_uid}")
+async def device_delete(device_uid: str, db: Session = Depends(get_db)):
+    auth_device = db.query(models.AuthDeviceData).filter(
+        models.AuthDeviceData.device_uid == device_uid
     ).first()
-    return waiting_device
+    
+    if not auth_device:
+        return JSONResponse(
+            content={"response": 404, "message": "Device not found"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    db.delete(auth_device)
+    db.commit()
+    
+    return JSONResponse(
+        content={"response": 200, "message": "Device deleted successfully"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
