@@ -107,7 +107,44 @@ class GameData(Base):
     __tablename__ = "game_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, index = True)
-    
-    
+    title = Column(String, index=True)
+    game_start_time = Column(DateTime, default=datetime.now())
+    game_calcul_time = Column(DateTime, default=datetime.now())
+    game_stop_time = Column(DateTime, default=None, nullable=True)
+    game_end_time = Column(DateTime, default=None, nullable=True)
+    game_status = Column(String, index=True, default="waiting")  # waiting, in_progress, end
+    game_in_player = Column(JSON, default=list)
+    table_connect_log = Column(JSON, default=list)
+
     # 게임 데이터는 프리셋 전체 데이터를 가짐     
+    time_table_data = Column(JSON)
+    buy_in_price = Column(Integer)
+    re_buy_in_price = Column(Integer)
+    starting_chip = Column(Integer)
+    rebuyin_payment_chips = Column(JSON)
+    rebuyin_number_limits = Column(JSON)
+    addon_data = Column(JSON)
+    prize_settings = Column(JSON)
+    rebuy_cut_off = Column(JSON)
+    
+    def to_json(self):
+        return {
+            "id" : self.id,
+            "title" : self.title,
+            "game_start_time" : self.game_start_time.isoformat(),
+            "game_calcul_time" : self.game_calcul_time.isoformat(),
+            "game_stop_time" : self.game_stop_time.isoformat() if self.game_stop_time else None,
+            "game_end_time" : self.game_end_time.isoformat() if self.game_end_time else None,
+            "game_status" : self.game_status,
+            "game_in_player" : self.game_in_player,
+            "table_connect_log" : self.table_connect_log,
+            "time_table_data" : self.time_table_data,
+            "buy_in_price" : self.buy_in_price,
+            "re_buy_in_price" : self.re_buy_in_price,
+            "starting_chip" : self.starting_chip,
+            "rebuyin_payment_chips" : self.rebuyin_payment_chips,
+            "rebuyin_number_limits" : self.rebuyin_number_limits,
+            "addon_data" : self.addon_data,
+            "prize_settings" : self.prize_settings,
+            "rebuy_cut_off" : self.rebuy_cut_off
+        }
