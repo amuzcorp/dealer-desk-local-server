@@ -79,3 +79,38 @@ async def get_presets(db: Session = Depends(get_db)):
         content={"response": 200, "data": preset_list},
         headers={"Content-Type": "application/json; charset=utf-8"}
     ) 
+    
+@router.delete("/delete-preset/{preset_id}")
+async def delete_preset(preset_id: int, db: Session = Depends(get_db)):
+    preset = db.query(models.PresetData).filter(models.PresetData.id == preset_id).first()
+    if not preset:
+        return JSONResponse(
+            content={"response": 404, "message": "Preset not found"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    db.delete(preset)
+    db.commit()
+    
+@router.put("/update-preset/{preset_id}")
+async def update_preset(preset_id: int, preset: schemas.PresetData, db: Session = Depends(get_db)):
+    existing_preset = db.query(models.PresetData).filter(models.PresetData.id == preset_id).first()
+    if not existing_preset:
+        return JSONResponse(
+            content={"response": 404, "message": "Preset not found"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+        
+    print(existing_preset.prize_settings)
+    
+    preset_data = jsonable_encoder(preset)
+    for key, value in preset_data.items():
+        if key != "id":
+            setattr(existing_preset, key, value)
+    
+    db.commit()
+    
+    return JSONResponse(
+        content={"response": 200, "message": "Preset updated successfully"},
+        headers={"Content-Type": "application/json; charset=utf-8"} 
+    )
