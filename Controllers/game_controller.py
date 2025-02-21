@@ -6,6 +6,8 @@ from typing import List
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
+from sse_starlette.sse import EventSourceResponse
 
 import json
 import sys
@@ -34,13 +36,46 @@ async def get_first_last_game_start_date(db: Session = Depends(get_db)):
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     
-    return {
-        "first_game_start_date": first_game.game_start_time,
-        "last_game_start_date": last_game.game_start_time
-    }
+    return JSONResponse(
+        content={
+            "response": 200,
+            "message": "Game start dates retrieved successfully",
+            "data": {
+                "first_game_start_date": first_game.game_start_time.isoformat(),
+                "last_game_start_date": last_game.game_start_time.isoformat()
+            }
+        },
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
+@router.get("/get-activate-games")
+async def get_activate_games(db: Session = Depends(get_db)):
+    async def get_active_list(db_inFun : Session):
+        games = db_inFun.query(models.GameData).filter(models.GameData.game_status.in_(["wating", "playing"])).all()
+        game_list = []
+        for g in games:
+            game_list.append(g.to_json())
+        return game_list
     
-@router.post("/create-game/{preset_id}/{table_id}")
-async def create_game(preset_id: int, table_id: int, db: Session = Depends(get_db)):
+    async def event_generator(db_inFun : Session):
+        while True:
+            try:
+                game_list = await get_active_list(db_inFun)
+                print("데이터 전송됨")
+                yield f"{json.dumps(game_list)}\n\n"
+                await asyncio.sleep(3)
+            except Exception as e:
+                print(f"오류 발생: {str(e)}")
+                yield f"error: {str(e)}\n\n"
+                break;
+
+    return EventSourceResponse(event_generator(db), media_type="text/event-stream")
+
+@router.post("/create-game")
+async def create_game(game_data: dict, db: Session = Depends(get_db)):
+    preset_id = game_data.get("preset_id")
+    table_id = game_data.get("table_id")
+    
     if not preset_id or not table_id:
         return JSONResponse(
             content={"response": 400, "message": "Preset ID and Table ID are required"},
@@ -54,6 +89,7 @@ async def create_game(preset_id: int, table_id: int, db: Session = Depends(get_d
         )
     
     # 프리셋 데이터 가져오기
+    print(preset_id)
     preset = db.query(models.PresetData).filter(models.PresetData.id == preset_id).first()
     if not preset:
         return JSONResponse(
@@ -68,7 +104,6 @@ async def create_game(preset_id: int, table_id: int, db: Session = Depends(get_d
         game_calcul_time=datetime.now(),
         game_stop_time=None,
         game_end_time=None,
-        game_status="waiting",
         game_in_player=[],
         table_connect_log=[
             {
@@ -91,10 +126,10 @@ async def create_game(preset_id: int, table_id: int, db: Session = Depends(get_d
     db.commit()
     
     return JSONResponse(
-        content={"response": 200, "message": "Game created successfully"},
+        content={"response": 200, "message": "Game created successfully", "game_id": game.id},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
-
+    
 from datetime import datetime
 
 @router.get("/get-period-lookup")
@@ -129,6 +164,8 @@ async def get_period_lookup(firstdate: str = None, lastdate: str = None, db: Ses
     game_list = []
     for g in game:
         game_list.append(g.to_json())
+        
+    print(len(game_list))
     
     return JSONResponse(
         content={"response": 200, "message": "Game found", "data": game_list},

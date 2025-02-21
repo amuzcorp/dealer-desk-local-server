@@ -27,6 +27,14 @@ class DeviceNameChangeData:
             device_name=json_data["device_name"]
         )
     
+@dataclass
+class DeviceSocketData:
+    device_uid: str
+    device_socket: WebSocket
+    table_title: str = None
+    
+device_socket_data : List[DeviceSocketData] = [];
+
 router = APIRouter(
     prefix="/devices",
     tags=["devices"]
@@ -107,10 +115,11 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
             await asyncio.sleep(1)
         
         await send_socket_message(websocket, 200, "connected")
-        
+        device_socket_data.append(DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket))
+        await connect_table_device_socket_event(device_data.device_uid, db)
         if(auth_device):
             await update_auth_device_status(auth_device.device_uid, True, db)
-             
+        
         # 메시지 수신 대기
         while True:
             data = await websocket.receive_text()
@@ -121,6 +130,16 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         auth_device = db.query(models.AuthDeviceData).filter(
                 models.AuthDeviceData.device_uid == device_data.device_uid
             ).first()
+        
+        # 디바이스 소켓 찾기
+        device_socket = next(
+            (socket for socket in device_socket_data if socket.device_uid == device_data.device_uid),
+            None
+        )
+        
+        if device_socket:
+            del device_socket_data[device_socket_data.index(device_socket)]
+        
 
         if auth_device:
             await update_auth_device_status(auth_device.device_uid, False, db)
@@ -284,3 +303,80 @@ async def device_delete(device_uid: str, db: Session = Depends(get_db)):
         content={"response": 200, "message": "Device deleted successfully"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+
+@router.post("/connect-table-device")
+async def connect_table_device(device_uid: str, table_id: str = None, db: Session = Depends(get_db)):
+    device_data = db.query(models.AuthDeviceData).filter(
+        models.AuthDeviceData.device_uid == device_uid
+    ).first()
+    
+    if not device_data:
+        return JSONResponse(
+            content={"response": 404, "message": "Device not found"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    device_data.connect_table_id = table_id
+    db.commit()
+    
+    await connect_table_device_socket_event(device_uid, db)
+    
+    return JSONResponse(
+        content={"response": 200, "message": "Device connected to table successfully"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+    
+    
+async def connect_table_device_socket_event(device_uid: str, db: Session = Depends(get_db)):
+    device_data = db.query(models.AuthDeviceData).filter(
+        models.AuthDeviceData.device_uid == device_uid
+    ).first()
+    device_uid = device_data.device_uid
+    print(device_data.connect_table_id)
+    
+    if(device_data.connect_table_id == None):
+        # 테이블 연결 해제
+        # uid에 해당하는 소켓 찾기
+        # 디바이스 소켓 찾기
+        device_socket = next(
+            (socket for socket in device_socket_data if socket.device_uid == device_uid),
+            None
+        )
+        device_socket.table_title = None
+
+        # 소켓이 존재하면 연결 해제 메시지 전송
+        if device_socket:
+            disconnect_message = {
+                "response": 200,
+                "message": "disconnect"
+            }
+            await device_socket.device_socket.send_text(json.dumps(disconnect_message))
+        
+        return
+    
+    # 테이블 찾기
+    # 테이블 데이터 조회
+    table_data = db.query(models.TableData).filter(
+        models.TableData.id == device_data.connect_table_id-1
+    ).first()
+    
+    # 디버깅을 위한 로그 출력
+    print(f"테이블 데이터: {table_data}")
+    print(f"연결할 테이블 ID: {device_data.connect_table_id}")
+    print(f"테이블 데이터 타입: {type(table_data)}")
+    print(f"테이블 데이터 타입: {table_data.table_title}")
+    
+    if not table_data:
+        return
+    
+    # 테이블 타이틀 받기
+    table_title = table_data.table_title
+    
+    for device in device_socket_data:
+        if device.device_uid == device_uid:
+            await device.device_socket.send_text(json.dumps({
+                "response": 200,
+                "data" : "connect_table",
+                "table_title" : table_title
+            }))
+            break

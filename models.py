@@ -7,6 +7,7 @@ class TableData(Base):
     __tablename__ = "table_data"
 
     id = Column(Integer, primary_key=True, index=True)
+    game_id = Column(Integer, nullable=True, index=True)
     table_title = Column(String, index=True)
     current_player_count = Column(Integer, default = 0)
     max_player_count = Column(Integer, default = 12)
@@ -19,6 +20,7 @@ class TableData(Base):
     def to_json(self):
         return {
                 "id" : self.id,
+                "game_id" : self.game_id,
                 "table_title" : self.table_title,
                 "current_player_count" : self.current_player_count,
                 "max_player_count" : self.max_player_count,
@@ -127,6 +129,9 @@ class GameData(Base):
     prize_settings = Column(JSON)
     rebuy_cut_off = Column(JSON)
     
+    # 최종 상금
+    final_prize = Column(Integer, default=0)
+    
     def to_json(self):
         return {
             "id" : self.id,
@@ -146,5 +151,6 @@ class GameData(Base):
             "rebuyin_number_limits" : self.rebuyin_number_limits,
             "addon_data" : self.addon_data,
             "prize_settings" : self.prize_settings,
-            "rebuy_cut_off" : self.rebuy_cut_off
+            "rebuy_cut_off" : self.rebuy_cut_off,
+            "final_prize" : self.final_prize
         }
