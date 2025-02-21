@@ -245,20 +245,19 @@ async def get_waiting_device(db: Session = Depends(get_db)):
         models.RequestDeviceData.connect_status == "waiting"
     ).all()
     
-    if waiting_device:
-        device_list = []
-        for device in waiting_device:
-            device_json = device.to_json()
-            device_json["request_time"] = device_json["request_time"].isoformat()
-            device_json["update_time"] = device_json["update_time"].isoformat()
-            device_list.append(device_json)
+    device_list = []
+    for device in waiting_device:
+        device_json = device.to_json()
+        device_json["request_time"] = device_json["request_time"].isoformat()
+        device_json["update_time"] = device_json["update_time"].isoformat()
+        device_list.append(device_json)
             
-        device_list.sort(key=lambda x: x["request_time"])
+    device_list.sort(key=lambda x: x["request_time"])
             
-        return JSONResponse(
-            content={"response": 200, "data": device_list},
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )    
+    return JSONResponse(
+        content={"response": 200, "data": device_list},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )    
  
 @router.post("/device-name-change")
 async def device_name_change(device_data: DeviceNameChangeData, db: Session = Depends(get_db)):
