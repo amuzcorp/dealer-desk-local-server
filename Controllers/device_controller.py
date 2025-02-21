@@ -116,6 +116,8 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         
         await send_socket_message(websocket, 200, "connected")
         device_socket_data.append(DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket))
+        # 2초간 대기
+        await asyncio.sleep(2)
         await connect_table_device_socket_event(device_data.device_uid, db)
         if(auth_device):
             await update_auth_device_status(auth_device.device_uid, True, db)
@@ -348,16 +350,16 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
         if device_socket:
             disconnect_message = {
                 "response": 200,
-                "message": "disconnect"
+                "data": "table_disconnect"
             }
             await device_socket.device_socket.send_text(json.dumps(disconnect_message))
         
         return
     
     # 테이블 찾기
-    # 테이블 데이터 조회
+    # 테이블 데이터 조회 
     table_data = db.query(models.TableData).filter(
-        models.TableData.id == device_data.connect_table_id-1
+        models.TableData.id == device_data.connect_table_id
     ).first()
     
     # 디버깅을 위한 로그 출력

@@ -5,6 +5,7 @@ from typing import List
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
+from Controllers import device_controller
 
 import json
 import sys
@@ -58,6 +59,16 @@ async def save_table(tables: List[schemas.TableData], db: Session = Depends(get_
     ).all()
     
     for table_to_delete in tables_to_delete:
+        # 디바이스 db에 해당 테이블 연결 해제
+        device_data = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.connect_table_id == table_to_delete.id
+        ).all()
+        for device in device_data:
+            device.connect_table_id = None
+            db.commit()
+            print(f"디바이스 연결 해제: {device.device_uid}")
+            await device_controller.connect_table_device_socket_event(device.device_uid, db)
+            
         db.delete(table_to_delete)
     
     for table in tables:
