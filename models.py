@@ -35,7 +35,7 @@ class AuthDeviceData(Base):
     id = Column(Integer, primary_key=True, index=True)
     device_uid = Column(String, index=True)
     device_name = Column(String, index=True)
-    connect_table_id = Column(Integer, ForeignKey("table_data.id", ondelete="CASCADE"), index=True)
+    connect_table_id = Column(Integer, ForeignKey("table_data.id", ondelete="CASCADE"), index=True, nullable=True)
     created_at = Column(DateTime, default=datetime.now())
     is_connected = Column(Boolean, default=False)
     

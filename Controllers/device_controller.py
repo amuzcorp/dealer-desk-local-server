@@ -319,6 +319,7 @@ async def connect_table_device(device_uid: str, table_id: str = None, db: Sessio
         )
     
     device_data.connect_table_id = table_id
+    print(f"디바이스 연결 테이블 ID: {device_data.connect_table_id}")
     db.commit()
     
     await connect_table_device_socket_event(device_uid, db)
@@ -368,7 +369,13 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
     print(f"테이블 데이터 타입: {type(table_data)}")
     print(f"테이블 데이터 타입: {table_data.table_title}")
     
-    if not table_data:
+    if table_data is None:
+        print("테이블 데이터가 없습니다.")
+        disconnect_message = {
+                "response": 200,
+                "data": "table_disconnect"
+            }
+        await device_socket.device_socket.send_text(json.dumps(disconnect_message))
         return
     
     # 테이블 타이틀 받기
