@@ -112,10 +112,23 @@ async def disconnect_game(table_id: str, db: Session = Depends(get_db)):
                 content={"response": 404, "message": "테이블을 찾을 수 없습니다"},
                 headers={"Content-Type": "application/json; charset=utf-8"}
             )
-        
+            
+        game = db.query(models.GameData).filter(models.GameData.id == table.game_id).first()
         table.game_id = None
         db.commit()
+        if not game:
+            return JSONResponse(
+                content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
         
+        game.table_connect_log.append({
+            "table_id": table_id,
+            "is_connected": False,
+            "connect_time": datetime.now().isoformat()
+        })
+        
+        db.commit()
         return JSONResponse(
             content={"response": 200, "message": "테이블 게임 ID 연결 해제 성공"},
             headers={"Content-Type": "application/json; charset=utf-8"}

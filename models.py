@@ -112,7 +112,7 @@ class GameData(Base):
     title = Column(String, index=True)
     game_start_time = Column(DateTime, default=datetime.now())
     game_calcul_time = Column(DateTime, default=datetime.now())
-    game_stop_time = Column(DateTime, default=None, nullable=True)
+    game_stop_time = Column(DateTime, nullable=True, default=datetime.now())
     game_end_time = Column(DateTime, default=None, nullable=True)
     game_status = Column(String, index=True, default="waiting")  # waiting, in_progress, end
     game_in_player = Column(JSON, default=list)

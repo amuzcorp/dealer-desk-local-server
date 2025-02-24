@@ -51,7 +51,7 @@ async def get_first_last_game_start_date(db: Session = Depends(get_db)):
 @router.get("/get-activate-games")
 async def get_activate_games(db: Session = Depends(get_db)):
     async def get_active_list(db_inFun : Session):
-        games = db_inFun.query(models.GameData).filter(models.GameData.game_status.in_(["wating", "playing"])).all()
+        games = db_inFun.query(models.GameData).filter(models.GameData.game_status.in_(["waiting", "in-progress"])).all()
         game_list = []
         for g in games:
             game_list.append(g.to_json())
@@ -61,7 +61,7 @@ async def get_activate_games(db: Session = Depends(get_db)):
         while True:
             try:
                 game_list = await get_active_list(db_inFun)
-                print("데이터 전송됨")
+                print(f"전송된 게임 개수 : {len(game_list)}")
                 yield f"{json.dumps(game_list)}\n\n"
                 await asyncio.sleep(3)
             except Exception as e:
@@ -169,5 +169,33 @@ async def get_period_lookup(firstdate: str = None, lastdate: str = None, db: Ses
     
     return JSONResponse(
         content={"response": 200, "message": "Game found", "data": game_list},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+    
+@router.post("/control-game-state")
+async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
+    game_id = game_data.get("game_id")
+    game_status = game_data.get("game_status")
+    
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "Game not found"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    if game_status == "in-progress":
+        game.game_status = game_status
+        if game.game_stop_time:
+            # 중지 시간과 현재 시간 차이 값 구하기
+            calc_time = datetime.now() - game.game_stop_time
+            game.game_calcul_time = game.game_calcul_time + calc_time
+            game.game_stop_time = None 
+    elif game_status == "stop":
+        game.game_stop_time = datetime.now()
+    db.commit()
+    
+    return JSONResponse(
+        content={"response": 200, "message": "Game status updated successfully"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
