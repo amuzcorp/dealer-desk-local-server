@@ -193,6 +193,7 @@ async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
             game.game_stop_time = None 
     elif game_status == "stop":
         game.game_stop_time = datetime.now()
+        print(game.game_calcul_time)
     db.commit()
     
     return JSONResponse(
