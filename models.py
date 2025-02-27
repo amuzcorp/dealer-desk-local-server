@@ -188,3 +188,37 @@ class PurchaseData(Base):
             "price": self.price,
             "used_points": self.used_points
         }
+
+class UserData(Base):
+    __tablename__ = "user_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    phone_number = Column(String, index=True)
+    register_way = Column(String, default="MANUAL")
+    game_join_count = Column(Integer, default=0)
+    visit_count = Column(Integer, default=0)
+    register_at = Column(DateTime, default=datetime.now())
+    last_visit_at = Column(DateTime, default=datetime.now())
+    point = Column(Integer, default=0)
+    total_point = Column(Integer, default=0)
+    remark = Column(String, default="")
+    awarding_history = Column(JSON, default=[])
+    point_history = Column(JSON, default=[])
+    
+    def to_json(self):
+        return {
+            "id": self.id,
+            "name": self.user_name,
+            "phone_number": self.user_phone_number,
+            "register_way": self.register_way,
+            "game_join_count": self.game_join_count,
+            "visit_count": self.visit_count,
+            "register_at": self.register_at.isoformat() if self.register_at else None,
+            "last_visit_at": self.last_visit_at.isoformat() if self.last_visit_at else None,
+            "point": self.point,
+            "total_point": self.total_point,
+            "remark": self.remark,
+            "awarding_history": self.awarding_history,
+            "point_history": self.point_history
+        }
