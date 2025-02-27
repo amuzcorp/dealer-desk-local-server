@@ -1,8 +1,11 @@
 import asyncio
+from datetime import datetime
 import websockets
 import aiohttp
 import json
 import logging
+from database import get_db
+from models import PurchaseData
 
 # 로거 설정
 logger = logging.getLogger('ReverbTestController')
@@ -11,8 +14,11 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
+db = next(get_db())
 
 class ReverbTestController:
+    socket_id = ""
+    message_queue = []
     def __init__(self):
         self.bearer_token = ""
         self.login_uri = "http://127.0.0.1:8000/api/login"
@@ -51,6 +57,7 @@ class ReverbTestController:
         """WebSocket 채널 인증을 수행하는 메서드"""
         try:
             logger.debug(f'채널 인증 시도 - Channel: {self.channel_name}, SocketId: {socket_id}')
+            self.socket_id = socket_id
             
             async with aiohttp.ClientSession() as session:
                 headers = {
@@ -135,18 +142,82 @@ class ReverbTestController:
                     
                     elif data['event'] == 'pusher_internal:subscription_succeeded':
                         logger.info('채널 구독 성공')
-                    
                     elif data['event'] == 'pusher:error':
                         error_data = json.loads(data['data'])
                         logger.error(f'Pusher 에러: {error_data["code"]} - {error_data["message"]}')
+                    elif data['event'] == r'App\Events\PurchaseEvent':
+                        purchase_data_json = json.loads(data['data'])
+                        purchase_data = purchase_data_json["purchaseLog"]
+                        logger.info(f'구매 이벤트 수신: {purchase_data["user_id"]}')
                         
+                        # datetime 객체로 변환하여 SQLite 오류 해결
+                        purchased_at_str = purchase_data['purchased_at']
+                        purchased_at_datetime = datetime.strptime(purchased_at_str, '%Y-%m-%d %H:%M:%S')
+                        
+                        # 기존 레코드 확인
+                        existing_purchase = db.query(PurchaseData).filter(PurchaseData.id == purchase_data['id']).first()
+                        
+                        if existing_purchase:
+                            # 기존 레코드가 있으면 업데이트
+                            existing_purchase.purchase_type = purchase_data['purchase_type']
+                            existing_purchase.payment_type = purchase_data['payment_type']
+                            existing_purchase.table_id = purchase_data['table_id']
+                            existing_purchase.game_id = purchase_data['game_id']
+                            existing_purchase.user_id = purchase_data['user_id']
+                            existing_purchase.purchased_at = purchased_at_datetime
+                            existing_purchase.item = purchase_data['item']
+                            existing_purchase.payment_status = purchase_data['payment_status']
+                            existing_purchase.status = purchase_data['status']
+                            existing_purchase.price = purchase_data['price']
+                            existing_purchase.used_points = purchase_data['used_points']
+                        else:
+                            # 새 레코드 추가
+                            db.add(PurchaseData(
+                                id = purchase_data['id'],
+                                purchase_type = purchase_data['purchase_type'],
+                                payment_type = purchase_data['payment_type'],
+                                table_id = purchase_data['table_id'],
+                                game_id = purchase_data['game_id'],
+                                user_id = purchase_data['user_id'],
+                                purchased_at = purchased_at_datetime,  # 문자열 대신 datetime 객체 사용
+                                item = purchase_data['item'],
+                                payment_status = purchase_data['payment_status'],
+                                status = purchase_data['status'],
+                                price = purchase_data['price'],
+                                used_points = purchase_data['used_points'],
+                            ))
+                        db.commit()
         except Exception as e:
             logger.error(f'WebSocket 처리 중 에러 발생: {e}')
+
+    async def subscribe_send_message(self, event_name, channel_name, data_type, message):
+        subscription_message = {
+            "event": event_name,
+            "channel": channel_name,
+            "data": {
+                data_type : message,
+                "timestamp" : datetime.now().isoformat()
+            },
+        }
+        
+        try:
+            async with websockets.connect(self.server_url) as websocket:
+                # 대기 중인 메시지가 있으면 먼저 전송
+                if self.message_queue:
+                    for queued_message in self.message_queue:
+                        await websocket.send(json.dumps(queued_message))
+                    logger.info(f'{len(self.message_queue)}개의 대기 메시지 전송 완료')
+                    self.message_queue = []  # 큐 비우기
+                
+                # 현재 메시지 전송
+                await websocket.send(json.dumps(subscription_message))
+        except Exception as e:
+            # 연결 실패 시 메시지 큐에 저장
+            logger.warning(f'메시지 전송 실패, 큐에 저장: {e}')
+            self.message_queue.append(subscription_message)
+            logger.info(f'현재 대기 메시지 수: {len(self.message_queue)}개')
 
     async def main(self):
         """메인 실행 메서드"""
         logger.debug('WebSocket 연결 시도: ' + self.server_url)
         await self.handle_websocket()
-
-if __name__ == "__main__":
-    ReverbTestController()

@@ -1,11 +1,16 @@
+import asyncio
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from central_socket import ReverbTestController
 import models, schemas, database
-from Controllers import game_controller, table_controller, device_controller, preset_controller
+from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller
 
 # 데이터베이스 테이블 생성
 models.Base.metadata.create_all(bind=database.engine)
+
+# 테스트 구매 데이터 생성
+# database.create_test_purchase_data()
 
 app = FastAPI(
     title="FastAPI Project",
@@ -27,6 +32,9 @@ app.include_router(table_controller.router)
 app.include_router(device_controller.router)
 app.include_router(preset_controller.router)
 app.include_router(game_controller.router)
+app.include_router(purchase_controller.router)
+
+socket_controller = None;
 
 @app.get("/")
 async def root():
@@ -38,4 +46,16 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+    import threading
+    
+    # 웹소켓 서버를 백그라운드 스레드에서 비동기로 실행
+    def run_socket_server():
+        global socket_controller
+        socket_controller = ReverbTestController()
+    
+    # 백그라운드 스레드 시작
+    socket_thread = threading.Thread(target=run_socket_server, daemon=True)
+    socket_thread.start()
+    
+    # FastAPI 서버 실행
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)

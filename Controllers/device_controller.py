@@ -388,3 +388,33 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
                 "table_title" : table_title
             }))
             break
+
+
+async def send_connect_game_socket_event(device_uid: str, table_id: str, db: Session = Depends(get_db)):
+    table_data = db.query(models.TableData).filter(
+        models.TableData.id == table_id
+    ).first()
+    
+    game_id = table_data.game_id
+    if(game_id == None):
+        disconnect_message = {
+            "response": 200,
+            "data": "game_disconnect"
+        }
+        for device in device_socket_data:
+            if device.device_uid == device_uid:
+                await device.device_socket.send_text(json.dumps(disconnect_message))
+                break
+        return
+    
+    game_data = db.query(models.GameData).filter(
+        models.GameData.id == game_id
+    ).first()
+    
+    game_data_json = game_data.to_json()
+    
+    for device in device_socket_data:
+        if device.device_uid == device_uid:
+            await device.device_socket.send_text(json.dumps(game_data_json))
+            break
+    
