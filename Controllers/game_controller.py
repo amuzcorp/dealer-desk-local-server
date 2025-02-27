@@ -210,3 +210,11 @@ async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
         content={"response": 200, "message": "게임 상태가 성공적으로 업데이트되었습니다"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+
+
+@router.post("/control-game-time")  
+async def control_game_time(game_data: dict, db: Session = Depends(get_db)):
+    game_id = game_data.get("game_id")
+    game_time = game_data.get("game_time")
+    
+    

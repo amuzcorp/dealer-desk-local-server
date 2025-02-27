@@ -177,13 +177,15 @@ async def disconnect_game(table_id: str, db: Session = Depends(get_db)):
         
         # 로그 확인
         db.refresh(game)
-        device = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_id).first() 
+        devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_id).all()
+         
         print(f"커밋 후 게임 로그: {game.table_connect_log}")
         
         # 테이블에 연결된 디바이스가 있으면 이벤트 전송
-        if device:
-            print(f"테이블에 연결된 디바이스 UID: {device.device_uid}")
-            await device_controller.send_connect_game_socket_event(device.device_uid, table_id, db)
+        if devices:
+            for device in devices:
+                print(f"테이블에 연결된 디바이스 UID: {device.device_uid}")
+                await device_controller.send_connect_game_socket_event(device.device_uid, table_id, db)
         else:
             print(f"테이블 {table_id}에 연결된 디바이스가 없습니다.")
         
