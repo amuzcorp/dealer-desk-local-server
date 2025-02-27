@@ -194,7 +194,7 @@ class UserData(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
-    phone_number = Column(String, index=True)
+    phone_number = Column(String, index=True, nullable=True)
     register_way = Column(String, default="매장가입")
     game_join_count = Column(Integer, default=0)
     visit_count = Column(Integer, default=0)
