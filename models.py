@@ -209,8 +209,8 @@ class UserData(Base):
     def to_json(self):
         return {
             "id": self.id,
-            "name": self.user_name,
-            "phone_number": self.user_phone_number,
+            "name": self.name,
+            "phone_number": self.phone_number,
             "register_way": self.register_way,
             "game_join_count": self.game_join_count,
             "visit_count": self.visit_count,
