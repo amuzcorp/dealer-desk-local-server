@@ -195,7 +195,7 @@ class UserData(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     phone_number = Column(String, index=True, nullable=True)
-    register_way = Column(String, default="매장가입")
+    regist_mail = Column(String, nullable=True)
     game_join_count = Column(Integer, default=0)
     visit_count = Column(Integer, default=0)
     register_at = Column(DateTime, default=datetime.now())
@@ -211,7 +211,7 @@ class UserData(Base):
             "id": self.id,
             "name": self.name,
             "phone_number": self.phone_number,
-            "register_way": self.register_way,
+            "regist_mail": self.regist_mail,
             "game_join_count": self.game_join_count,
             "visit_count": self.visit_count,
             "register_at": self.register_at.isoformat() if self.register_at else None,

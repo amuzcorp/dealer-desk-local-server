@@ -33,6 +33,45 @@ def get_db():
     finally:
         db.close()
 
+def create_test_user_data():
+    import models
+    from datetime import datetime
+    import random
+    
+    db = SessionLocal()
+    try:
+        # 이미 테스트 사용자가 있는지 확인
+        existing_user = db.query(models.UserData).filter(
+            models.UserData.name.like("guest%")
+        ).first()
+        
+        if existing_user:
+            print("테스트 사용자가 이미 존재합니다.")
+            return
+
+        for i in range(10):
+            # 테스트 일반 사용자 생성
+            normal_user = models.UserData(
+                name=f"테스트사용자{i}",
+                phone_number=f"01012345678{i}",
+                regist_mail=f"test{i}@test.com",
+                register_at=datetime.now(),
+                last_visit_at=datetime.now(),
+                point=5000,
+                total_point=5000,
+                game_join_count=5,
+                visit_count=10
+            )
+        
+            db.add(normal_user)
+        db.commit()
+        
+        print("테스트 사용자가 성공적으로 생성되었습니다.")
+    except Exception as e:
+        print(f"테스트 사용자 생성 중 오류 발생: {e}")
+    finally:
+        db.close()
+
 # 테스트 데이터 생성 함수
 def create_test_purchase_data():
     import models

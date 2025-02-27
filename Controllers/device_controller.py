@@ -1,4 +1,5 @@
 import asyncio
+from datetime import time
 from fastapi import APIRouter, Depends, HTTPException, WebSocket
 from sqlalchemy.orm import Session
 from typing import List
@@ -387,6 +388,8 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
                 "data" : "connect_table",
                 "table_title" : table_title
             }))
+            await asyncio.sleep(1)
+            await send_connect_game_socket_event(device_uid, device_data.connect_table_id, db)
             break
 
 
@@ -411,10 +414,25 @@ async def send_connect_game_socket_event(device_uid: str, table_id: str, db: Ses
         models.GameData.id == game_id
     ).first()
     
-    game_data_json = game_data.to_json()
+    game_data_json = {
+        "response": 200,
+        "data" : "game_connect",
+        "game_data" : game_data.to_json()
+    }
     
     for device in device_socket_data:
+        print(device.device_uid)
+        print(device_uid)
+        print(device.device_uid == device_uid)
+        print(device.device_socket)
         if device.device_uid == device_uid:
-            await device.device_socket.send_text(json.dumps(game_data_json))
+            if device.device_socket is None:
+                print(f"디바이스 {device_uid}의 소켓이 연결되어 있지 않습니다")
+                continue
+            try:
+                print(f"디바이스 {device_uid}에 게임 연결 이벤트 전송")
+                await device.device_socket.send_text(json.dumps(game_data_json))
+            except Exception as e:
+                print(f"디바이스 {device_uid}에 메시지 전송 중 오류 발생: {str(e)}")
             break
     

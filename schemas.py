@@ -98,3 +98,35 @@ class PresetData(BaseModel):
 
     class Config:
         from_attributes = True 
+
+"""
+사용자 데이터
+"""
+class UserDataBase(BaseModel):
+    id: Optional[int] = None
+    name: str
+    phone_number: Optional[str] = None
+    regist_mail: Optional[str] = None
+    game_join_count: int
+    visit_count: int
+    register_at: datetime
+    last_visit_at: datetime
+    point: int
+    total_point: int
+    remark: str
+    awarding_history: List[Dict[str, Any]]
+    point_history: List[Dict[str, Any]]
+    
+class UserDataCreate(UserDataBase):
+    pass
+
+class UserDataUpdate(UserDataBase):
+    id: int
+    
+    class Config:
+        from_attributes = True 
+    
+class UserData(UserDataBase):
+    id: Optional[int] = None
+    
+    

@@ -177,8 +177,15 @@ async def disconnect_game(table_id: str, db: Session = Depends(get_db)):
         
         # 로그 확인
         db.refresh(game)
+        device = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_id).first() 
         print(f"커밋 후 게임 로그: {game.table_connect_log}")
-        await device_controller.send_connect_game_socket_event(table.device_uid, table_id, db)
+        
+        # 테이블에 연결된 디바이스가 있으면 이벤트 전송
+        if device:
+            print(f"테이블에 연결된 디바이스 UID: {device.device_uid}")
+            await device_controller.send_connect_game_socket_event(device.device_uid, table_id, db)
+        else:
+            print(f"테이블 {table_id}에 연결된 디바이스가 없습니다.")
         
         return JSONResponse(
             content={"response": 200, "message": "테이블 게임 ID 연결 해제 성공"},
@@ -254,12 +261,21 @@ async def connect_table_game_id(table_game_id: dict, db: Session = Depends(get_d
         db.refresh(game)
         print(f"커밋 후 게임 로그: {game.table_connect_log}")
         
-        # 업데이트된 테이블 정보 조회
-        updated_table = db.query(models.TableData).filter(models.TableData.id == table_id).first()
-        await device_controller.send_connect_game_socket_event(updated_table.device_uid, table_id, db)
+        # 테이블에 연결된 디바이스 조회
+        devices = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.connect_table_id == table_id
+        ).all()
         
+        # 연결된 디바이스가 있으면 게임 연결 이벤트 전송
+        if devices:
+            for device in devices:
+                print(f"테이블에 연결된 디바이스 UID: {device.device_uid}")
+                await device_controller.send_connect_game_socket_event(device.device_uid, table_id, db)
+        else:
+            print(f"테이블 {table_id}에 연결된 디바이스가 없습니다.")
+            
         return JSONResponse(
-            content={"response": 200, "message": "테이블 게임 ID 업데이트 성공", "data": updated_table.to_json()},
+            content={"response": 200, "message": "테이블 게임 ID 업데이트 성공", "data": table.to_json()},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
         

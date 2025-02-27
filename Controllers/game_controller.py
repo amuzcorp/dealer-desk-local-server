@@ -15,6 +15,7 @@ import os
 from dataclasses import dataclass
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from Controllers import device_controller, table_controller
 import models
 import schemas
 from database import get_db
@@ -105,13 +106,7 @@ async def create_game(game_data: dict, db: Session = Depends(get_db)):
         game_stop_time=None,
         game_end_time=None,
         game_in_player=[],
-        table_connect_log=[
-            {
-                "table_id": table_id,
-                "is_connected": True,
-                "connect_time": datetime.now().isoformat()
-            }
-        ],
+        table_connect_log=[],
         time_table_data=preset.time_table_data,
         buy_in_price=preset.buy_in_price,
         re_buy_in_price=preset.re_buy_in_price,
@@ -124,6 +119,12 @@ async def create_game(game_data: dict, db: Session = Depends(get_db)):
     )
     db.add(game)
     db.commit()
+    
+    await table_controller.connect_table_game_id(
+        {
+            "table_id": table_id,
+            "game_id": game.id
+        }, db)
     
     return JSONResponse(
         content={"response": 200, "message": "Game created successfully", "game_id": game.id},
@@ -180,7 +181,7 @@ async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
     game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
     if not game:
         return JSONResponse(
-            content={"response": 404, "message": "Game not found"},
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     
@@ -195,8 +196,17 @@ async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
         game.game_stop_time = datetime.now()
         print(game.game_calcul_time)
     db.commit()
+    db.refresh(game)
+    
+    
+    tables = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+    for table in tables:
+        devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
+        for device in devices:
+            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)
+    
     
     return JSONResponse(
-        content={"response": 200, "message": "Game status updated successfully"},
+        content={"response": 200, "message": "게임 상태가 성공적으로 업데이트되었습니다"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )

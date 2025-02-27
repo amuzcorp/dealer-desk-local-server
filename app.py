@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from central_socket import ReverbTestController
 import models, schemas, database
-from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller
+from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller
 
 # 데이터베이스 테이블 생성
 models.Base.metadata.create_all(bind=database.engine)
@@ -33,6 +33,7 @@ app.include_router(device_controller.router)
 app.include_router(preset_controller.router)
 app.include_router(game_controller.router)
 app.include_router(purchase_controller.router)
+app.include_router(user_controller.router)
 
 socket_controller = None;
 
@@ -57,5 +58,6 @@ if __name__ == "__main__":
     socket_thread = threading.Thread(target=run_socket_server, daemon=True)
     socket_thread.start()
     
+    # database.create_test_user_data()
     # FastAPI 서버 실행
     uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
