@@ -72,6 +72,17 @@ async def get_activate_games(db: Session = Depends(get_db)):
 
     return EventSourceResponse(event_generator(db), media_type="text/event-stream")
 
+@router.get("/get-active-game-no-sse-data")
+async def get_active_game_no_sse_data(db: Session = Depends(get_db)):
+    games = db.query(models.GameData).filter(models.GameData.game_status.in_(["waiting", "in-progress"])).all()
+    game_list = []
+    for g in games:
+        game_list.append(g.to_json())
+    return JSONResponse(
+        content={"response": 200, "message": "Active games retrieved successfully", "data": game_list},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
 @router.post("/create-game")
 async def create_game(game_data: dict, db: Session = Depends(get_db)):
     preset_id = game_data.get("preset_id")
@@ -212,9 +223,56 @@ async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/control-game-time")  
-async def control_game_time(game_data: dict, db: Session = Depends(get_db)):
-    game_id = game_data.get("game_id")
-    game_time = game_data.get("game_time")
+@router.put("/control-game-time/{game_id}")  
+async def control_game_time(game_id: str, time_dict: dict, db: Session = Depends(get_db)):
+    from datetime import timedelta
     
+    # 초로 받아옴
+    game_time_seconds = time_dict.get("game_time")
+    print(f"요청된 시간 조정: {game_time_seconds}초")
     
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    # 초 단위로 받은 시간을 timedelta로 변환
+    time_delta = timedelta(seconds=game_time_seconds)
+    
+    print("원래 시간 : ", game.game_calcul_time)
+    
+    # game.game_calcul_time이 존재하는 경우
+    if game.game_calcul_time:
+        # 시간을 앞으로 당기는 경우(양수) - 게임 시작 시간을 더 과거로 설정
+        if game_time_seconds > 0:
+            game.game_calcul_time = game.game_calcul_time - time_delta
+        # 시간을 뒤로 돌리는 경우(음수) - 게임 시작 시간을 더 최근으로 설정
+        else:
+            # 음수 값이므로 빼기 대신 더하기 사용
+            game.game_calcul_time = game.game_calcul_time - time_delta
+        
+        # 게임이 정지 상태인 경우 정지 시간도 동일하게 조정
+        # if game.game_stop_time:
+        #     if game_time_seconds > 0:
+        #         game.game_stop_time = game.game_stop_time - time_delta
+        #     else:
+        #         game.game_stop_time = game.game_stop_time - time_delta
+    
+    print(f"게임 시간 업데이트 후: {game.game_calcul_time}")
+    
+    db.commit()
+    db.refresh(game)
+    
+    # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
+    tables = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+    for table in tables:
+        devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
+        for device in devices:
+            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)
+    
+    return JSONResponse(
+        content={"response": 200, "message": "게임 시간이 성공적으로 업데이트되었습니다"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
