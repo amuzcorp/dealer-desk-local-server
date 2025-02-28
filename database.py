@@ -95,7 +95,6 @@ def create_test_purchase_data():
         # 1. SUCCESS 상태의 BUYIN 데이터
         success_buyin = models.PurchaseData(
             purchase_type="LOCAL_PAY",
-            payment_type="LOCAL_PAY",
             game_id=1,
             user_id=test_user_id,
             purchased_at=datetime.now(),
@@ -109,7 +108,6 @@ def create_test_purchase_data():
         # 2. WAITING 상태의 BUYIN 데이터
         waiting_buyin = models.PurchaseData(
             purchase_type="LOCAL_PAY",
-            payment_type="LOCAL_PAY",
             game_id=1,
             user_id=test_user_id,
             purchased_at=datetime.now(),
@@ -123,7 +121,6 @@ def create_test_purchase_data():
         # 3 & 4. WAITING 상태의 REBUYIN 데이터 (2개)
         waiting_rebuyin1 = models.PurchaseData(
             purchase_type="LOCAL_PAY",
-            payment_type="LOCAL_PAY",
             game_id=1,
             user_id=test_user_id,
             purchased_at=datetime.now(),
@@ -136,7 +133,6 @@ def create_test_purchase_data():
         
         waiting_rebuyin2 = models.PurchaseData(
             purchase_type="LOCAL_PAY",
-            payment_type="LOCAL_PAY",
             game_id=1,
             user_id=test_user_id,
             purchased_at=datetime.now(),
@@ -150,7 +146,6 @@ def create_test_purchase_data():
         # 5. PAYMENT_CHIP 상태의 BUYIN 데이터
         payment_chip_buyin = models.PurchaseData(
             purchase_type="LOCAL_PAY",
-            payment_type="LOCAL_PAY",
             game_id=1,
             user_id=test_user_id,
             purchased_at=datetime.now(),

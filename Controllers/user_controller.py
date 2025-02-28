@@ -22,12 +22,14 @@ class InGameUser:
     user_id: str
     join_count: int
     is_sit : bool
+    is_addon : bool
     
     def to_json(self):
         return {
             "user_id": self.user_id,
             "join_count": self.join_count,
-            "is_sit": self.is_sit
+            "is_sit": self.is_sit,
+            "is_addon": self.is_addon
         }
 
 router = APIRouter(
@@ -67,7 +69,7 @@ async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
     
     # 새 플레이어 정보 생성 및 추가
-    new_player = InGameUser(user_id=user_data.id, join_count=1, is_sit=True).to_json()
+    new_player = InGameUser(user_id=user_data.id, join_count=1, is_sit=True, is_addon=False).to_json()
     game_in_player.append(new_player)
     
     # 게임 플레이어 목록 직접 업데이트
@@ -243,7 +245,7 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
         )
     
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
-    add_in_game_user = InGameUser(user_id=user_id, join_count=1, is_sit=True).to_json()
+    add_in_game_user = InGameUser(user_id=user_id, join_count=1, is_sit=True, is_addon=False).to_json()
     game_in_player.append(add_in_game_user)
             
     db.query(models.GameData).filter(models.GameData.id == game_id).update(
@@ -252,6 +254,20 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
     
     db.commit()
     db.refresh(game)
+    
+    #결제 내역에 남기기
+    purchase_data = models.PurchaseData(
+        user_id=user_id,
+        purchase_type="LOCAL_PAY",
+        game_id=game_id,
+        item="BUYIN",
+        payment_status="COMPLETED",
+        status="SUCCESS",
+        price=0,
+        used_points=0
+    )
+    db.add(purchase_data)
+    db.commit()
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
@@ -262,5 +278,38 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
     
     return JSONResponse(
         content={"response": 200, "message": "게임 플레이어 참여 횟수가 업데이트되었습니다"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
+@router.put("/update-user-rebuy-in")
+async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends(get_db)):
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    game_in_player = game.game_in_player.copy() if game.game_in_player else []
+    for player in game_in_player:
+        if player.get("user_id") == user_id:
+            player["join_count"] += 1
+            
+    db.query(models.GameData).filter(models.GameData.id == game_id).update(
+        {"game_in_player": game_in_player}
+    )
+    
+    db.commit()
+    db.refresh(game)
+
+    # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
+    tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
+    for table in tables:
+        devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
+        for device in devices:
+            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)   
+
+    return JSONResponse(
+        content={"response": 200, "message": "게임 플레이어 리버이 인 상태가 업데이트되었습니다"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )

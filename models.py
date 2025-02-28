@@ -163,12 +163,11 @@ class PurchaseData(Base):
     __tablename__ = "purchase_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    purchase_type = Column(String, index=True)  # GAME, ITEM 등
-    payment_type = Column(String, index=True)  # LOCAL_PAY, CREDIT_CARD 등
+    purchase_type = Column(String, index=True)  # BUYIN, REBUYIN 등
     game_id = Column(Integer, ForeignKey("game_data.id"), nullable=True)
     user_id = Column(Integer, index=True)
     purchased_at = Column(DateTime, default=datetime.now())
-    item = Column(String, index=True)  # CHIP, ADDON 등
+    item = Column(String, index=True)  # BUYIN, REBUYIN 등
     payment_status = Column(String, default="WAITING")  # WAITING, COMPLETED, FAILED
     status = Column(String, default="WAITING")  # WAITING, COMPLETED, CANCELLED
     price = Column(Integer, default=0)
@@ -178,7 +177,6 @@ class PurchaseData(Base):
         return {
             "id": self.id,
             "purchase_type": self.purchase_type,
-            "payment_type": self.payment_type,
             "game_id": self.game_id,
             "user_id": self.user_id,
             "purchased_at": self.purchased_at.isoformat() if self.purchased_at else None,

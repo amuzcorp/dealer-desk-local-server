@@ -331,11 +331,8 @@ async def connect_table_device(device_uid: str, table_id: str = None, db: Sessio
     
     
 async def connect_table_device_socket_event(device_uid: str, db: Session = Depends(get_db)):
-    device_data = db.query(models.AuthDeviceData).filter(
-        models.AuthDeviceData.device_uid == device_uid
-    ).first()
-    device_uid = device_data.device_uid
-    print(device_data.connect_table_id)
+    # 디바이스 데이터 찾기
+    device_data = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.device_uid == device_uid).first()
     
     if(device_data.connect_table_id == None):
         # 테이블 연결 해제
@@ -345,10 +342,12 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
             (socket for socket in device_socket_data if socket.device_uid == device_uid),
             None
         )
-        device_socket.table_title = None
-
+        
         # 소켓이 존재하면 연결 해제 메시지 전송
         if device_socket:
+            device_socket.table_title = ""
+            device_data.connect_table_id = None
+            db.commit()
             disconnect_message = {
                 "response": 200,
                 "data": "table_disconnect"
@@ -364,10 +363,10 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
     ).first()
     
     # 디버깅을 위한 로그 출력
-    print(f"테이블 데이터: {table_data}")
-    print(f"연결할 테이블 ID: {device_data.connect_table_id}")
-    print(f"테이블 데이터 타입: {type(table_data)}")
-    print(f"테이블 데이터 타입: {table_data.table_title}")
+    # print(f"테이블 데이터: {table_data}")
+    # print(f"연결할 테이블 ID: {device_data.connect_table_id}")
+    # print(f"테이블 데이터 타입: {type(table_data)}")
+    # print(f"테이블 데이터 타입: {table_data.table_title}")
     
     if table_data is None:
         print("테이블 데이터가 없습니다.")
@@ -375,7 +374,10 @@ async def connect_table_device_socket_event(device_uid: str, db: Session = Depen
                 "response": 200,
                 "data": "table_disconnect"
             }
-        await device_socket.device_socket.send_text(json.dumps(disconnect_message))
+        for device in device_socket_data:
+            if device.device_uid == device_uid:
+                await device.device_socket.send_text(json.dumps(disconnect_message))
+                break
         return
     
     # 테이블 타이틀 받기
