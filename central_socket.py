@@ -18,14 +18,17 @@ db = next(get_db())
 
 class ReverbTestController:
     socket_id = ""
+    is_connected:bool = False
     message_queue = []
+    websocket = None
+    
     def __init__(self):
         self.bearer_token = ""
         self.login_uri = "http://127.0.0.1:8000/api/login"
         self.channel_name = "private-admin_penal" 
         self.server_url = "ws://192.168.200.115:6001/app/zyyqa9xa1labneonsu90"
-        logger.debug('ReverbTestController 초기화')
-        asyncio.run(self.main())
+        # logger.debug('ReverbTestController 초기화')
+        # asyncio.run(self.main())
 
     async def request_auth(self):
         """인증 요청을 수행하는 메서드"""
@@ -110,10 +113,37 @@ class ReverbTestController:
     async def handle_websocket(self):
         """WebSocket 연결 및 메시지 처리를 담당하는 메서드"""
         try:
-            async with websockets.connect(self.server_url) as websocket:
-                logger.info('WebSocket 연결 성공')
-                while True:
-                    message = await websocket.recv()
+            self.websocket = await websockets.connect(self.server_url)
+            logger.info('WebSocket 연결 성공')
+            
+            # 연결 후 대기 중인 메시지가 있으면 전송
+            if self.message_queue:
+                for queued_message in self.message_queue:
+                    await self.websocket.send(json.dumps(queued_message))
+                logger.info(f'{len(self.message_queue)}개의 대기 메시지 전송 완료')
+                self.message_queue = []  # 큐 비우기
+            
+            # 별도의 태스크로 메시지 수신 처리
+            asyncio.create_task(self.listen_for_messages())
+            
+            return True
+        except Exception as e:
+            logger.error(f'WebSocket 연결 중 에러 발생: {e}')
+            self.is_connected = False
+            return False
+
+    async def listen_for_messages(self):
+        """WebSocket 메시지 수신을 담당하는 메서드"""
+        try:
+            while True:
+                if not self.websocket:
+                    logger.warning("WebSocket이 연결되지 않았습니다. 재연결 시도...")
+                    await self.handle_websocket()
+                    await asyncio.sleep(5)  # 재연결 대기
+                    continue
+                
+                try:
+                    message = await self.websocket.recv()
                     data = json.loads(message)
                     logger.debug(f'수신된 메시지: {data}')
                     
@@ -123,7 +153,7 @@ class ReverbTestController:
                             "event": "pusher:pong",
                             "data": {}
                         }
-                        await websocket.send(json.dumps(pong_response))
+                        await self.websocket.send(json.dumps(pong_response))
                     
                     elif data['event'] == 'pusher:connection_established':
                         connection_data = json.loads(data['data'])
@@ -137,11 +167,12 @@ class ReverbTestController:
                                 await self.subscribe_to_private_channel(
                                     self.channel_name,
                                     auth_data,
-                                    websocket
+                                    self.websocket
                                 )
                     
                     elif data['event'] == 'pusher_internal:subscription_succeeded':
                         logger.info('채널 구독 성공')
+                        self.is_connected = True
                     elif data['event'] == 'pusher:error':
                         error_data = json.loads(data['data'])
                         logger.error(f'Pusher 에러: {error_data["code"]} - {error_data["message"]}')
@@ -187,37 +218,60 @@ class ReverbTestController:
                                 used_points = purchase_data['used_points'],
                             ))
                         db.commit()
+                except websockets.exceptions.ConnectionClosed:
+                    logger.warning("WebSocket 연결이 닫혔습니다. 재연결 시도...")
+                    self.is_connected = False
+                    self.websocket = None
+                    await asyncio.sleep(5)  # 재연결 대기
+        
         except Exception as e:
-            logger.error(f'WebSocket 처리 중 에러 발생: {e}')
+            logger.error(f'메시지 수신 중 에러 발생: {e}')
+            self.is_connected = False
+            self.websocket = None
 
-    async def subscribe_send_message(self, event_name, channel_name, data_type, message):
+    async def create_game_data(self, game_data):
+        """게임 데이터 생성 메시지를 보내는 메서드"""
+        logger.info(f'게임 데이터 생성 메시지 전송 시도: 게임 ID {game_data.id}')
+        game_data_json = game_data.to_json()
+        await self.send_message("App\\Events\\WebSocketMessageListener", "private-admin_penal", "message", game_data_json)
+
+    async def send_message(self, event_name, channel_name, data_type, message):
+        """메시지를 WebSocket을 통해 전송하는 메서드"""
         subscription_message = {
             "event": event_name,
             "channel": channel_name,
             "data": {
-                data_type : message,
-                "timestamp" : datetime.now().isoformat()
+                data_type: message,
+                "timestamp": datetime.now().isoformat()
             },
         }
         
+        if not self.is_connected or not self.websocket:
+            logger.warning(f'WebSocket 연결이 없습니다. 메시지를 큐에 저장합니다.')
+            self.message_queue.append(subscription_message)
+            logger.info(f'현재 대기 메시지 수: {len(self.message_queue)}개')
+            # 연결 시도
+            await self.handle_websocket()
+            return
+        
         try:
-            async with websockets.connect(self.server_url) as websocket:
-                # 대기 중인 메시지가 있으면 먼저 전송
-                if self.message_queue:
-                    for queued_message in self.message_queue:
-                        await websocket.send(json.dumps(queued_message))
-                    logger.info(f'{len(self.message_queue)}개의 대기 메시지 전송 완료')
-                    self.message_queue = []  # 큐 비우기
-                
-                # 현재 메시지 전송
-                await websocket.send(json.dumps(subscription_message))
+            await self.websocket.send(json.dumps(subscription_message))
+            logger.info(f'메시지 전송 성공: {event_name}')
         except Exception as e:
-            # 연결 실패 시 메시지 큐에 저장
             logger.warning(f'메시지 전송 실패, 큐에 저장: {e}')
             self.message_queue.append(subscription_message)
             logger.info(f'현재 대기 메시지 수: {len(self.message_queue)}개')
+            self.is_connected = False
+            self.websocket = None
+            # 연결 재시도
+            await self.handle_websocket()
+
+    async def subscribe_send_message(self, event_name, channel_name, data_type, message):
+        """이전 버전의 메시지 전송 메서드 (하위 호환성을 위해 유지)"""
+        await self.send_message(event_name, channel_name, data_type, message)
 
     async def main(self):
         """메인 실행 메서드"""
         logger.debug('WebSocket 연결 시도: ' + self.server_url)
-        await self.handle_websocket()
+        success = await self.handle_websocket()
+        return success

@@ -47,7 +47,16 @@ async def get_user_list(db: Session = Depends(get_db)):
         content={"response": 200, "message": "User list", "data": user_list_json},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
-    
+@router.get("/get-all-user-list")
+async def get_all_user_list(db: Session = Depends(get_db)):
+    user_list = db.query(models.UserData).all()
+    user_list_json = []
+    for user in user_list:
+        user_list_json.append(user.to_json())
+    return JSONResponse(
+        content={"response": 200, "message": "User list", "data": user_list_json},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
 @router.put("/create-guest-user/{game_id}")
 async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     user_data = models.UserData(
@@ -263,7 +272,7 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
         item="BUYIN",
         payment_status="COMPLETED",
         status="SUCCESS",
-        price=0,
+        price=game.buy_in_price,
         used_points=0
     )
     db.add(purchase_data)
@@ -299,6 +308,19 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
         {"game_in_player": game_in_player}
     )
     
+    #결제 내역에 남기기
+    purchase_data = models.PurchaseData(
+        user_id=user_id,
+        purchase_type="LOCAL_PAY",
+        game_id=game_id,
+        item="REBUYIN",
+        payment_status="COMPLETED",
+        status="SUCCESS",
+        price=game.re_buy_in_price,
+        used_points=0
+    )
+    db.add(purchase_data)
+    
     db.commit()
     db.refresh(game)
 
@@ -311,5 +333,52 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
 
     return JSONResponse(
         content={"response": 200, "message": "게임 플레이어 리버이 인 상태가 업데이트되었습니다"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
+@router.put("/update-user-in-game-addon")
+async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, db: Session = Depends(get_db)):
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    game_in_player = game.game_in_player.copy() if game.game_in_player else []
+    for player in game_in_player:
+        if player.get("user_id") == user_id:
+            player["is_addon"] = is_addon
+            
+    # 명시적으로 DB 업데이트 쿼리 실행
+    db.query(models.GameData).filter(models.GameData.id == game_id).update(
+        {"game_in_player": game_in_player}
+    )
+    
+    #결제 내역에 남기기
+    purchase_data = models.PurchaseData(
+        user_id=user_id,
+        purchase_type="LOCAL_PAY",
+        game_id=game_id,
+        item="ADDON",
+        payment_status="COMPLETED",
+        status="SUCCESS",
+        price=game.addon_price,
+        used_points=0
+    )
+    db.add(purchase_data)
+    
+    db.commit()
+    db.refresh(game)
+    
+    # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
+    tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
+    for table in tables:
+        devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
+        for device in devices:
+            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)   
+
+    return JSONResponse(
+        content={"response": 200, "message": "게임 플레이어 애드온 상태가 업데이트되었습니다"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )

@@ -35,7 +35,24 @@ app.include_router(game_controller.router)
 app.include_router(purchase_controller.router)
 app.include_router(user_controller.router)
 
-socket_controller = None;
+socket_controller: ReverbTestController = ReverbTestController()
+
+async def startup_event():
+    global socket_controller
+    try:
+        success = await socket_controller.main()
+        if success:
+            print("소켓 컨트롤러가 성공적으로 초기화되었습니다")
+        else:
+            print("소켓 컨트롤러 초기화 실패")
+    except Exception as e:
+        print(f"소켓 컨트롤러 초기화 중 오류 발생: {str(e)}")
+        socket_controller = None
+
+@app.on_event("startup")
+async def on_startup():
+    # FastAPI 시작 시 소켓 컨트롤러 초기화
+    await startup_event()
 
 @app.get("/")
 async def root():
@@ -47,17 +64,11 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    import threading
     
-    # 웹소켓 서버를 백그라운드 스레드에서 비동기로 실행
-    def run_socket_server():
-        global socket_controller
-        socket_controller = ReverbTestController()
+    # # FastAPI 이벤트에서 소켓 초기화가 처리되므로 여기서는 필요 없음
+    # # 하지만 FastAPI 이벤트 전에 실행하고 싶다면 아래와 같이 실행할 수 있음
+    # asyncio.run(startup_event())
     
-    # 백그라운드 스레드 시작
-    socket_thread = threading.Thread(target=run_socket_server, daemon=True)
-    socket_thread.start()
-    
-    # database.create_test_user_data()
+    print("소켓 컨트롤러가 null인가? : ", socket_controller is None)
     # FastAPI 서버 실행
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

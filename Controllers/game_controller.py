@@ -13,6 +13,8 @@ import json
 import sys
 import os
 from dataclasses import dataclass
+
+# import app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from Controllers import device_controller, table_controller
@@ -136,6 +138,14 @@ async def create_game(game_data: dict, db: Session = Depends(get_db)):
             "table_id": table_id,
             "game_id": game.id
         }, db)
+    
+    import main
+    
+    if main.socket_controller and main.socket_controller.is_connected:
+        print("소켓에 보내는중")
+        await main.socket_controller.create_game_data(game)
+    else:
+        print("소켓 컨트롤러가 초기화되지 않았거나 연결되지 않았습니다")
     
     return JSONResponse(
         content={"response": 200, "message": "Game created successfully", "game_id": game.id},
