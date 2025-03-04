@@ -300,3 +300,17 @@ async def control_game_time(game_id: str, time_dict: dict, db: Session = Depends
         content={"response": 200, "message": "게임 시간이 성공적으로 업데이트되었습니다"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+    
+@router.get("/get-game-by-id/{game_id}")
+async def get_game_by_id(game_id: int, db: Session = Depends(get_db)):
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    return JSONResponse(
+        content={"response": 200, "message": "게임을 찾았습니다", "data": game.to_json()},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )

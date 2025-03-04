@@ -58,13 +58,37 @@ async def login(login_data: LoginData):
         success = await socket_controller.main(user_id=login_data.user_id, user_pwd=login_data.user_pwd)
         if success:
             print("소켓 컨트롤러가 성공적으로 초기화되었습니다")
-            return {"status": "success"}
+            return {"status": "success", "store_name": socket_controller.store_name}
         else:
             print("소켓 컨트롤러 초기화 실패")
-            return {"status": "failed"}
+            return {"status": "failed", "message": "소켓 연결 또는 인증 실패"}
     except Exception as e:
-        print(f"소켓 컨트롤러 초기화 중 오류 발생: {str(e)}")
+        error_message = str(e)
+        print(f"소켓 컨트롤러 초기화 중 오류 발생: {error_message}")
+        if "인증 실패" in error_message:
+            return {"status": "failed", "message": error_message, "code": "AUTH_ERROR"}
         socket_controller = None
+        return {"status": "error", "message": error_message}
+
+@app.post("/logout")
+async def logout():
+    """로그아웃 처리를 수행하는 엔드포인트"""
+    global socket_controller
+    try:
+        if socket_controller is None:
+            return {"status": "success", "message": "이미 로그아웃된 상태입니다"}
+            
+        success = await socket_controller.logout()
+        if success:
+            print("소켓 컨트롤러가 성공적으로 종료되었습니다")
+            return {"status": "success", "message": "로그아웃 성공"}
+        else:
+            print("소켓 컨트롤러 종료 실패")
+            return {"status": "failed", "message": "로그아웃 처리 중 오류가 발생했습니다"}
+    except Exception as e:
+        error_message = str(e)
+        print(f"로그아웃 처리 중 오류 발생: {error_message}")
+        return {"status": "error", "message": error_message}
 
 if __name__ == "__main__":
     import uvicorn
