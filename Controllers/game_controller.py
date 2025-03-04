@@ -115,7 +115,7 @@ async def create_game(game_data: dict, db: Session = Depends(get_db)):
     # 게임 데이터 생성
     game = models.GameData(
         title=preset.preset_name,
-        game_code=str(random.randint(0, 999999)).zfill(6),
+        game_code=str(random.randint(0, 99999)).zfill(5),
         game_start_time=datetime.now(),
         game_calcul_time=datetime.now(),
         game_stop_time=None,
