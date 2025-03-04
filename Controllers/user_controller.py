@@ -88,9 +88,19 @@ async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     
     db.commit()
     
-    # 업데이트 확인을 위해 다시 조회
-    updated_game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
-    print(f"게임 {game_id}에 사용자 {user_data.id} 추가 완료: {updated_game.game_in_player}")
+    #결제 내역에 남기기
+    purchase_data = models.PurchaseData(
+        user_id=user_data.id,
+        purchase_type="LOCAL_PAY",
+        game_id=game_id,
+        item="BUYIN",
+        payment_status="COMPLETED",
+        status="SUCCESS",
+        price=game.buy_in_price,
+        used_points=0
+    )
+    db.add(purchase_data)
+    db.commit()
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()

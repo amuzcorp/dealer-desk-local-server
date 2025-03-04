@@ -78,3 +78,15 @@ async def payment_chip_to_success(purchase_id: int, db: Session = Depends(get_db
         },
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+
+@router.get("/get-purchase-data-by-user-id/{user_id}")
+async def get_purchase_data_by_user_id(user_id: int, db: Session = Depends(get_db)):
+    purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.user_id == user_id).all()
+    return_data = []
+    for data in purchase_data:
+        formatted_data = data.to_json()
+        return_data.append(formatted_data)
+    return JSONResponse(
+        content={"response": 200, "message": "Purchase data retrieved successfully", "data": return_data},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
