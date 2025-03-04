@@ -19,8 +19,13 @@ db = next(get_db())
 class ReverbTestController:
     socket_id = ""
     is_connected:bool = False
+    is_subscribed:bool = False  # 채널 구독 상태를 추적하는 플래그 추가
     message_queue = []
     websocket = None
+    user_id = ""
+    user_pwd = ""
+    tenant_id = ""
+    is_handling_message = False
     
     def __init__(self):
         self.bearer_token = ""
@@ -33,10 +38,11 @@ class ReverbTestController:
     async def request_auth(self):
         """인증 요청을 수행하는 메서드"""
         try:
+            logger.debug(f'로그인 시도 - User ID: {self.user_id}, User PWD: {self.user_pwd}')
             async with aiohttp.ClientSession() as session:
                 auth_data = { 
-                    "email": "test@amuz.co.kr",
-                    "password": "amuz1234"
+                    "email": self.user_id,
+                    "password": self.user_pwd
                 }
                 headers = {
                     'Content-Type': 'application/json',
@@ -49,12 +55,18 @@ class ReverbTestController:
                     headers=headers
                 ) as response:
                     data = await response.json()
-                    self.bearer_token = data['token']
-                    logger.debug(f'Bearer Token: {self.bearer_token}')
-                    return data
+                    print(data)
+                    if 'token' in data:
+                        self.bearer_token = data['token']
+                        self.tenant_id = data['stores'][0]['tenant_id']
+                        logger.debug(f'Bearer Token: {self.bearer_token}')
+                        return data
+                    else:
+                        logger.error('토큰이 응답에 없습니다. 인증 실패')
+                        return False
         except Exception as e:
             logger.error(f'인증 에러 발생: {e}')
-            return None
+            return False
 
     async def broadcast_authentication(self, socket_id):
         """WebSocket 채널 인증을 수행하는 메서드"""
@@ -124,7 +136,9 @@ class ReverbTestController:
                 self.message_queue = []  # 큐 비우기
             
             # 별도의 태스크로 메시지 수신 처리
-            asyncio.create_task(self.listen_for_messages())
+            if not self.is_handling_message:
+                self.is_handling_message = True
+                asyncio.create_task(self.listen_for_messages())
             
             return True
         except Exception as e:
@@ -136,7 +150,7 @@ class ReverbTestController:
         """WebSocket 메시지 수신을 담당하는 메서드"""
         try:
             while True:
-                if not self.websocket:
+                if self.websocket == None:
                     logger.warning("WebSocket이 연결되지 않았습니다. 재연결 시도...")
                     await self.handle_websocket()
                     await asyncio.sleep(5)  # 재연결 대기
@@ -160,8 +174,9 @@ class ReverbTestController:
                         socket_id = connection_data['socket_id']
                         logger.debug(f'Socket ID: {socket_id}')
                         
+                        logger.debug(f'로그인 시도 - User ID: {self.user_id}, User PWD: {self.user_pwd}')
                         auth_response = await self.request_auth()
-                        if auth_response:
+                        if auth_response and auth_response is not False:
                             auth_data = await self.broadcast_authentication(socket_id)
                             if auth_data:
                                 await self.subscribe_to_private_channel(
@@ -169,10 +184,22 @@ class ReverbTestController:
                                     auth_data,
                                     self.websocket
                                 )
+                        else:
+                            logger.error('인증 실패로 채널 구독을 진행할 수 없습니다.')
+                            self.is_connected = False
                     
                     elif data['event'] == 'pusher_internal:subscription_succeeded':
                         logger.info('채널 구독 성공')
                         self.is_connected = True
+                        self.is_subscribed = True  # 구독 성공 시 플래그 설정
+                        
+                        # 구독 성공 시 대기 중인 메시지 전송
+                        if self.message_queue:
+                            logger.info(f'구독 성공 후 {len(self.message_queue)}개의 대기 메시지 전송 시작')
+                            for queued_message in self.message_queue:
+                                await self.websocket.send(json.dumps(queued_message))
+                            logger.info('대기 메시지 전송 완료')
+                            self.message_queue = []  # 큐 비우기
                     elif data['event'] == 'pusher:error':
                         error_data = json.loads(data['data'])
                         logger.error(f'Pusher 에러: {error_data["code"]} - {error_data["message"]}')
@@ -222,18 +249,19 @@ class ReverbTestController:
                     logger.warning("WebSocket 연결이 닫혔습니다. 재연결 시도...")
                     self.is_connected = False
                     self.websocket = None
+                    self.is_handling_message = False
                     await asyncio.sleep(5)  # 재연결 대기
         
         except Exception as e:
             logger.error(f'메시지 수신 중 에러 발생: {e}')
             self.is_connected = False
             self.websocket = None
-
+            self.is_handling_message = False
     async def create_game_data(self, game_data):
         """게임 데이터 생성 메시지를 보내는 메서드"""
         logger.info(f'게임 데이터 생성 메시지 전송 시도: 게임 ID {game_data.id}')
         game_data_json = game_data.to_json()
-        await self.send_message("App\\Events\\WebSocketMessageListener", "private-admin_penal", "message", game_data_json)
+        await self.send_message("App\\Events\\WebSocketMessageListener", "private-admin_penal", "GameData", game_data_json)
 
     async def send_message(self, event_name, channel_name, data_type, message):
         """메시지를 WebSocket을 통해 전송하는 메서드"""
@@ -241,17 +269,21 @@ class ReverbTestController:
             "event": event_name,
             "channel": channel_name,
             "data": {
-                data_type: message,
+                "tenant_id": self.tenant_id,
+                "dataType": data_type,
+                "data": message,
                 "timestamp": datetime.now().isoformat()
             },
         }
         
-        if not self.is_connected or not self.websocket:
-            logger.warning(f'WebSocket 연결이 없습니다. 메시지를 큐에 저장합니다.')
+        if not self.is_connected or not self.websocket or not self.is_subscribed:
+            logger.warning(f'WebSocket 연결 또는 채널 구독이 없습니다. 메시지를 큐에 저장합니다.')
             self.message_queue.append(subscription_message)
             logger.info(f'현재 대기 메시지 수: {len(self.message_queue)}개')
-            # 연결 시도
-            await self.handle_websocket()
+            
+            if not self.is_connected or not self.websocket:
+                # 연결이 끊어진 경우 재연결 시도
+                await self.handle_websocket()
             return
         
         try:
@@ -262,6 +294,7 @@ class ReverbTestController:
             self.message_queue.append(subscription_message)
             logger.info(f'현재 대기 메시지 수: {len(self.message_queue)}개')
             self.is_connected = False
+            self.is_subscribed = False  # 예외 발생 시 구독 상태도 초기화
             self.websocket = None
             # 연결 재시도
             await self.handle_websocket()
@@ -270,8 +303,36 @@ class ReverbTestController:
         """이전 버전의 메시지 전송 메서드 (하위 호환성을 위해 유지)"""
         await self.send_message(event_name, channel_name, data_type, message)
 
-    async def main(self):
+    async def login_with_token(self, token):
+        """토큰을 사용한 로그인 메서드"""
+        logger.debug('토큰으로 로그인 시도')
+        self.bearer_token = token
+        
+        # 이미 연결되어 있다면 연결을 재사용
+        if self.is_connected and self.websocket:
+            logger.debug('이미 WebSocket이 연결되어 있습니다. 기존 연결을 유지합니다.')
+            return True
+            
+        # 새로운 WebSocket 연결 시도
+        success = await self.handle_websocket()
+        return success
+
+    async def main(self, user_id, user_pwd):
         """메인 실행 메서드"""
         logger.debug('WebSocket 연결 시도: ' + self.server_url)
+        self.user_id = user_id
+        self.user_pwd = user_pwd
+        
+        # 이미 연결되어 있다면 연결을 재사용
+        if self.is_connected and self.websocket:
+            logger.debug('이미 WebSocket이 연결되어 있습니다. 기존 연결을 유지합니다.')
+            return True
+        
+        # 인증 요청 먼저 수행
+        auth_result = await self.request_auth()
+        if not auth_result or auth_result is False:
+            logger.error('인증 실패. WebSocket 연결을 진행하지 않습니다.')
+            return False
+            
         success = await self.handle_websocket()
         return success

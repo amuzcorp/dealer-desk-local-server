@@ -109,6 +109,7 @@ class GameData(Base):
     __tablename__ = "game_data"
 
     id = Column(Integer, primary_key=True, index=True)
+    game_code = Column(String, index=True)
     title = Column(String, index=True)
     game_start_time = Column(DateTime, default=datetime.now())
     game_calcul_time = Column(DateTime, default=datetime.now())
@@ -137,13 +138,14 @@ class GameData(Base):
     def to_json(self):
         return {
             "id" : self.id,
+            "game_code" : self.game_code,
             "title" : self.title,
             "game_start_time" : self.game_start_time.isoformat(),
             "game_calcul_time" : self.game_calcul_time.isoformat(),
             "game_stop_time" : self.game_stop_time.isoformat() if self.game_stop_time else None,
             "game_end_time" : self.game_end_time.isoformat() if self.game_end_time else None,
             "game_status" : self.game_status,
-            "addon_count" : self.addon_count,
+            "addon_count" : self.addon_count, 
             "addon_price" : self.addon_price,
             "game_in_player" : self.game_in_player,
             "table_connect_log" : self.table_connect_log,

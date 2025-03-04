@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from central_socket import ReverbTestController
 import models, schemas, database
+import dataclasses
 from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller
 
 # 데이터베이스 테이블 생성
@@ -37,23 +38,6 @@ app.include_router(user_controller.router)
 
 socket_controller: ReverbTestController = ReverbTestController()
 
-async def startup_event():
-    global socket_controller
-    try:
-        success = await socket_controller.main()
-        if success:
-            print("소켓 컨트롤러가 성공적으로 초기화되었습니다")
-        else:
-            print("소켓 컨트롤러 초기화 실패")
-    except Exception as e:
-        print(f"소켓 컨트롤러 초기화 중 오류 발생: {str(e)}")
-        socket_controller = None
-
-@app.on_event("startup")
-async def on_startup():
-    # FastAPI 시작 시 소켓 컨트롤러 초기화
-    await startup_event()
-
 @app.get("/")
 async def root():
     return {"message": "FastAPI 서버가 실행중입니다!"}
@@ -61,6 +45,26 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@dataclasses.dataclass
+class LoginData:
+    user_id: str
+    user_pwd: str
+
+@app.post("/login")
+async def login(login_data: LoginData):
+    global socket_controller
+    try:
+        success = await socket_controller.main(user_id=login_data.user_id, user_pwd=login_data.user_pwd)
+        if success:
+            print("소켓 컨트롤러가 성공적으로 초기화되었습니다")
+            return {"status": "success"}
+        else:
+            print("소켓 컨트롤러 초기화 실패")
+            return {"status": "failed"}
+    except Exception as e:
+        print(f"소켓 컨트롤러 초기화 중 오류 발생: {str(e)}")
+        socket_controller = None
 
 if __name__ == "__main__":
     import uvicorn

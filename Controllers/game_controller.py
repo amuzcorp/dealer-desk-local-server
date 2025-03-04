@@ -1,6 +1,7 @@
 import asyncio
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, WebSocket
+import random
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, logger
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.responses import JSONResponse
@@ -114,6 +115,7 @@ async def create_game(game_data: dict, db: Session = Depends(get_db)):
     # 게임 데이터 생성
     game = models.GameData(
         title=preset.preset_name,
+        game_code=str(random.randint(0, 999999)).zfill(6),
         game_start_time=datetime.now(),
         game_calcul_time=datetime.now(),
         game_stop_time=None,
@@ -141,11 +143,20 @@ async def create_game(game_data: dict, db: Session = Depends(get_db)):
     
     import main
     
+    print(f'소켓 컨트롤러 상태: {main.socket_controller}')
+    
     if main.socket_controller and main.socket_controller.is_connected:
-        print("소켓에 보내는중")
-        await main.socket_controller.create_game_data(game)
+        print(f'게임 데이터 소켓 전송 시작 - 게임 ID: {game.id}')
+        try:
+            await main.socket_controller.create_game_data(game)
+            print(f'게임 데이터 소켓 전송 성공 - 게임 ID: {game.id}')
+        except Exception as e:
+            print(f'게임 데이터 소켓 전송 중 오류 발생: {e}')
     else:
-        print("소켓 컨트롤러가 초기화되지 않았거나 연결되지 않았습니다")
+        print(f'소켓 컨트롤러 연결 상태: {getattr(main.socket_controller, "is_connected", None)}')
+        print(f'소켓 컨트롤러 구독 상태: {getattr(main.socket_controller, "is_subscribed", None)}')
+        if main.socket_controller:
+            print(f'소켓 ID: {main.socket_controller.socket_id}')
     
     return JSONResponse(
         content={"response": 200, "message": "Game created successfully", "game_id": game.id},
@@ -216,15 +227,18 @@ async def control_game_state(game_data: dict, db: Session = Depends(get_db)):
     elif game_status == "stop":
         game.game_stop_time = datetime.now()
         print(game.game_calcul_time)
+    elif game_status == "end":
+        game.game_end_time = datetime.now()
+        game.game_status = "end"
     db.commit()
     db.refresh(game)
     
-    
-    tables = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
-    for table in tables:
-        devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
-        for device in devices:
-            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)
+    if game_status != "end":
+        tables = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        for table in tables:
+            devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
+            for device in devices:
+                await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)
     
     
     return JSONResponse(
