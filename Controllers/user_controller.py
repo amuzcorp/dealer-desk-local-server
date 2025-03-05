@@ -288,7 +288,7 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase
             purchase_type="LOCAL_PAY",
             game_id=game_id,
             item="BUYIN",
-            payment_status="COMPLETED",
+            payment_status="SUCCESS",
             status="SUCCESS",
             price=game.buy_in_price,
             used_points=0
@@ -336,7 +336,7 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
         purchase_type="LOCAL_PAY",
         game_id=game_id,
         item="REBUYIN",
-        payment_status="COMPLETED",
+        payment_status="SUCCESS",
         status="SUCCESS",
         price=game.re_buy_in_price,
         used_points=0

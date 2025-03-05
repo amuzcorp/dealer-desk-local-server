@@ -29,7 +29,7 @@ router = APIRouter(
 # 구매 데이터 조회
 @router.get("/get-purchase-data")
 async def get_purchase_data(db: Session = Depends(get_db)):
-    purchase_data = db.query(models.PurchaseData).all()
+    purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.payment_status == "SUCCESS").all()
     
     return_data = []
     for data in purchase_data:
@@ -94,7 +94,7 @@ async def chip_waiting_to_success(purchase_id: int, db: Session = Depends(get_db
 
 @router.get("/get-purchase-data-by-user-id/{user_id}")
 async def get_purchase_data_by_user_id(user_id: int, db: Session = Depends(get_db)):
-    purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.customer_id == user_id).all()
+    purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.customer_id == user_id, models.PurchaseData.payment_status == "SUCCESS").all()
     return_data = []
     for data in purchase_data:
         formatted_data = data.to_json()
@@ -106,7 +106,7 @@ async def get_purchase_data_by_user_id(user_id: int, db: Session = Depends(get_d
 
 @router.get("/get-purchase-data-by-game-id/{game_id}")
 async def get_purchase_data_by_game_id(game_id: int, db: Session = Depends(get_db)):
-    purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.game_id == game_id).all()
+    purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.game_id == game_id, models.PurchaseData.payment_status == "SUCCESS").all()
     return_data = []
     for data in purchase_data:
         formatted_data = data.to_json()
@@ -124,7 +124,8 @@ async def get_purchase_data_by_date(startTime: str, endTime: str, db: Session = 
         
         purchase_data = db.query(models.PurchaseData).filter(
             models.PurchaseData.purchased_at >= startTime_dateTime,
-            models.PurchaseData.purchased_at <= endTime_dateTime
+            models.PurchaseData.purchased_at <= endTime_dateTime,
+            models.PurchaseData.payment_status == "SUCCESS"
         ).all()
         
         return_data = []
