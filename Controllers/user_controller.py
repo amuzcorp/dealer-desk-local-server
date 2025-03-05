@@ -262,7 +262,7 @@ async def update_user_in_game_sit_statue(game_id: int, user_id: int, is_sit: boo
     )
 
 @router.put("/update-user-in-game-join-count")
-async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session = Depends(get_db)):
+async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase: bool = False, db: Session = Depends(get_db)):
     game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
     if not game:
         return JSONResponse(
@@ -281,19 +281,20 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
     db.commit()
     db.refresh(game)
     
-    #결제 내역에 남기기
-    purchase_data = models.PurchaseData(
-        customer_id=user_id,
-        purchase_type="LOCAL_PAY",
-        game_id=game_id,
-        item="BUYIN",
-        payment_status="COMPLETED",
-        status="SUCCESS",
-        price=game.buy_in_price,
-        used_points=0
-    )
-    db.add(purchase_data)
-    db.commit()
+    if not is_purchase:
+        #결제 내역에 남기기
+        purchase_data = models.PurchaseData(
+            customer_id=user_id,
+            purchase_type="LOCAL_PAY",
+            game_id=game_id,
+            item="BUYIN",
+            payment_status="COMPLETED",
+            status="SUCCESS",
+            price=game.buy_in_price,
+            used_points=0
+        )
+        db.add(purchase_data)
+        db.commit()
     
     import main
     

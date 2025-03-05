@@ -16,6 +16,7 @@ import os
 from dataclasses import dataclass
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from Controllers import user_controller
 import models
 import schemas
 from database import get_db
@@ -51,26 +52,37 @@ async def waiting_to_payment_chip(purchase_id: int, db: Session = Depends(get_db
     if not purchase_data:
         raise HTTPException(status_code=404, detail="Purchase data not found")
     
-    purchase_data.status = "PAYMENT_CHIP"
+    purchase_data.payment_status = "SUCCESS"
+    purchase_data.status = "CHIP_WAITING"
     db.commit()
+    
+    import main
+    await main.socket_controller.update_purchase_data_payment_success(purchase_data)
+    
+    await user_controller.update_user_in_game_join_count(game_id=purchase_data.game_id, user_id=purchase_data.customer_id, is_purchase=True, db=db)
+    
     return JSONResponse(
         content={
             "response": 200,
             "message": "Purchase data updated successfully",
-            "data": purchase_data
+            "data": purchase_data.to_json()
         },
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
 
-# 구매 데이터 컨트롤 - PAYMENT_CHIP to SUCCESS
-@router.get("/payment-chip-to-success/{purchase_id}")
-async def payment_chip_to_success(purchase_id: int, db: Session = Depends(get_db)):
+# 구매 데이터 컨트롤 - CHIP_WAITING to SUCCESS
+@router.get("/chip-waiting-to-success/{purchase_id}")
+async def chip_waiting_to_success(purchase_id: int, db: Session = Depends(get_db)):
     purchase_data = db.query(models.PurchaseData).filter(models.PurchaseData.id == purchase_id).first()
     if not purchase_data:
         raise HTTPException(status_code=404, detail="Purchase data not found")
     
     purchase_data.status = "SUCCESS"
     db.commit()
+    
+    import main
+    await main.socket_controller.update_purchase_data_chip_success(purchase_data)
+    
     return JSONResponse(
         content={
             "response": 200,

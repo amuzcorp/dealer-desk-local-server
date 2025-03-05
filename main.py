@@ -13,6 +13,8 @@ models.Base.metadata.create_all(bind=database.engine)
 # 테스트 구매 데이터 생성
 # database.create_test_purchase_data()
 
+# 임의 플레이어 데이터 추가
+
 app = FastAPI(
     title="FastAPI Project",
     description="FastAPI 프로젝트 기본 설정",

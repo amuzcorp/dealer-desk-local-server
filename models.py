@@ -168,6 +168,7 @@ class PurchaseData(Base):
     purchase_type = Column(String, index=True)  # BUYIN, REBUYIN 등
     game_id = Column(Integer, ForeignKey("game_data.id"), nullable=True)
     customer_id = Column(Integer, index=True)
+    uuid = Column(String, index=True)
     purchased_at = Column(DateTime, default=datetime.now())
     item = Column(String, index=True)  # BUYIN, REBUYIN 등
     payment_status = Column(String, default="WAITING")  # WAITING, COMPLETED, FAILED
@@ -181,6 +182,7 @@ class PurchaseData(Base):
             "purchase_type": self.purchase_type,
             "game_id": self.game_id,
             "customer_id": self.customer_id,
+            "uuid": self.uuid,
             "purchased_at": self.purchased_at.isoformat() if self.purchased_at else None,
             "item": self.item,
             "payment_status": self.payment_status,

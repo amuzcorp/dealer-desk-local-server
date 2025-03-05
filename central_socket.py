@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from database import get_db
 from models import PurchaseData
+import models
 
 # 로거 설정
 logger = logging.getLogger('ReverbTestController')
@@ -305,10 +306,10 @@ class ReverbTestController:
                         logger.info('메시지 수신')
                         purchase_data = json.loads(data['data'])['purchaseLog']
                         purchase_model = PurchaseData(
-                            id=purchase_data['id'],
                             purchase_type=purchase_data['purchase_type'],
                             game_id=purchase_data['game_id'],
                             customer_id=purchase_data['customer_id'], 
+                            uuid=purchase_data['uuid'],
                             purchased_at=datetime.strptime(purchase_data['purchased_at'], '%Y-%m-%d %H:%M:%S'),
                             item=purchase_data['item'],
                             payment_status=purchase_data['payment_status'],
@@ -319,6 +320,7 @@ class ReverbTestController:
                         db.add(purchase_model)
                         db.commit()
                         db.refresh(purchase_model)
+                        logger.info(f'구매 데이터 저장: {purchase_model.id}')
                         
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("WebSocket 연결이 닫혔습니다.")
@@ -351,6 +353,16 @@ class ReverbTestController:
         logger.info(f'게임 데이터 업데이트 메시지 전송 시도: 게임 ID {game_data.id}')
         game_data_json = game_data.to_json()
         await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="GameData", message=game_data_json)
+        
+    async def update_purchase_data_payment_success(self, purchase_data:models.PurchaseData):
+        """구매 데이터 업데이트 메시지를 보내는 메서드"""
+        logger.info(f'구매 데이터 업데이트 메시지 전송 시도: 구매 ID {purchase_data.id}')
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="PaymentSucess", message=purchase_data.uuid)
+
+    async def update_purchase_data_chip_success(self, purchase_data:models.PurchaseData):
+        """구매 데이터 업데이트 메시지를 보내는 메서드"""
+        logger.info(f'구매 데이터 업데이트 메시지 전송 시도: 구매 ID {purchase_data.id}')
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="ChipSuccess", message=purchase_data.uuid)
 
     async def send_message(self, event_name, channel_name, data_type, message):
         """메시지를 WebSocket을 통해 전송하는 메서드"""

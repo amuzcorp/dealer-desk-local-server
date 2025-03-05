@@ -34,6 +34,8 @@ async def create_awarding_history(awarding_history: schemas.AwardingHistoryCreat
     db_awarding_history = models.AwardingHistoryData(
         game_id=awarding_history.game_id,
         customer_id=awarding_history.customer_id,
+        game_rank=awarding_history.game_rank,
+        awarding_at= datetime.now(),
         awarding_amount=awarding_history.awarding_amount
     )
     db.add(db_awarding_history)
@@ -54,3 +56,15 @@ async def get_awarding_history_by_user_id(user_id: int, db: Session = Depends(ge
         content={"response": 200, "message": "Awarding history created successfully", "data": response_data},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+
+@router.get("/get-awarding-history-by-game-id/{game_id}")
+async def get_awarding_history_by_game_id(game_id: int, db: Session = Depends(get_db)):
+    db_awarding_history = db.query(models.AwardingHistoryData).filter(models.AwardingHistoryData.game_id == game_id).all()
+    response_data = []
+    for awarding_history in db_awarding_history:
+        response_data.append(awarding_history.to_json())
+    return JSONResponse(
+        content={"response": 200, "message": "Awarding history created successfully", "data": response_data},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
