@@ -167,7 +167,7 @@ class PurchaseData(Base):
     id = Column(Integer, primary_key=True, index=True)
     purchase_type = Column(String, index=True)  # BUYIN, REBUYIN 등
     game_id = Column(Integer, ForeignKey("game_data.id"), nullable=True)
-    user_id = Column(Integer, index=True)
+    customer_id = Column(Integer, index=True)
     purchased_at = Column(DateTime, default=datetime.now())
     item = Column(String, index=True)  # BUYIN, REBUYIN 등
     payment_status = Column(String, default="WAITING")  # WAITING, COMPLETED, FAILED
@@ -180,7 +180,7 @@ class PurchaseData(Base):
             "id": self.id,
             "purchase_type": self.purchase_type,
             "game_id": self.game_id,
-            "user_id": self.user_id,
+            "customer_id": self.customer_id,
             "purchased_at": self.purchased_at.isoformat() if self.purchased_at else None,
             "item": self.item,
             "payment_status": self.payment_status,
@@ -222,3 +222,24 @@ class UserData(Base):
             "awarding_history": self.awarding_history,
             "point_history": self.point_history
         }
+
+class AwardingHistoryData(Base):
+    __tablename__ = "awarding_history_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    game_id = Column(Integer, ForeignKey("game_data.id"), nullable=True)
+    game_rank = Column(Integer, nullable=True)
+    customer_id = Column(Integer, ForeignKey("user_data.id"), nullable=True)
+    awarding_at = Column(DateTime, default=datetime.now())
+    awarding_amount = Column(Integer, default=0)
+    
+    def to_json(self):
+        return {
+            "id": self.id,
+            "game_id": self.game_id,
+            "game_rank": self.game_rank,
+            "customer_id": self.customer_id,
+            "awarding_at": self.awarding_at.isoformat() if self.awarding_at else None,
+            "awarding_amount": self.awarding_amount,
+        }
+

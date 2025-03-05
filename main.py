@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from central_socket import ReverbTestController
 import models, schemas, database
 import dataclasses
-from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller
+from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller
 
 # 데이터베이스 테이블 생성
 models.Base.metadata.create_all(bind=database.engine)
@@ -35,6 +35,7 @@ app.include_router(preset_controller.router)
 app.include_router(game_controller.router)
 app.include_router(purchase_controller.router)
 app.include_router(user_controller.router)
+app.include_router(awarding_controller.router)
 
 socket_controller: ReverbTestController = ReverbTestController()
 
@@ -69,6 +70,12 @@ async def login(login_data: LoginData):
             return {"status": "failed", "message": error_message, "code": "AUTH_ERROR"}
         socket_controller = None
         return {"status": "error", "message": error_message}
+
+@app.post("/re-connect-central-socket")
+async def re_connect_central_socket():
+    global socket_controller
+    socket_controller.handle_message()
+    return {"status": "success", "message": "소켓 연결 재시도"}
 
 @app.post("/logout")
 async def logout():

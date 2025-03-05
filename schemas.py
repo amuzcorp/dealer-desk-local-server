@@ -128,5 +128,29 @@ class UserDataUpdate(UserDataBase):
     
 class UserData(UserDataBase):
     id: Optional[int] = None
+
+"""
+ 시상 내역 데이터
+"""
+
+class AwardingHistoryBase(BaseModel):
+    id: Optional[int] = None
+    game_id: Optional[int] = None
+    game_rank: Optional[int] = None
+    customer_id: Optional[int] = None
+    awarding_at: Optional[datetime] = datetime.now()
+    awarding_amount: Optional[int] = 0
+
+class AwardingHistoryCreate(AwardingHistoryBase):
+    pass
+    
+class AwardingHistoryUpdate(AwardingHistoryBase):
+    id: int
+    
+class AwardingHistory(AwardingHistoryBase):
+    id: Optional[int] = None
+    
+    class Config:
+        from_attributes = True 
     
     

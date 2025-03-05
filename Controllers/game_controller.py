@@ -314,3 +314,22 @@ async def get_game_by_id(game_id: int, db: Session = Depends(get_db)):
         content={"response": 200, "message": "게임을 찾았습니다", "data": game.to_json()},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+    
+@router.put("/update-game-final-prize-by-id/{game_id}")
+async def update_game_final_prize_by_id(game_id: int, game_data: dict, db: Session = Depends(get_db)):
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    game.final_prize = game_data.get("final_prize")
+    db.commit()
+    db.refresh(game)
+    
+    return JSONResponse(
+        content={"response": 200, "message": "게임 정보가 성공적으로 업데이트되었습니다"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+    

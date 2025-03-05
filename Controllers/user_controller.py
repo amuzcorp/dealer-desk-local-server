@@ -19,14 +19,14 @@ from database import get_db
 from dataclasses import dataclass
 @dataclass
 class InGameUser:
-    user_id: str
+    customer_id: str
     join_count: int
     is_sit : bool
     is_addon : bool
     
     def to_json(self):
         return {
-            "user_id": self.user_id,
+            "customer_id": self.customer_id,
             "join_count": self.join_count,
             "is_sit": self.is_sit,
             "is_addon": self.is_addon
@@ -78,7 +78,7 @@ async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
     
     # 새 플레이어 정보 생성 및 추가
-    new_player = InGameUser(user_id=user_data.id, join_count=1, is_sit=True, is_addon=False).to_json()
+    new_player = InGameUser(customer_id=user_data.id, join_count=1, is_sit=True, is_addon=False).to_json()
     game_in_player.append(new_player)
     
     # 게임 플레이어 목록 직접 업데이트
@@ -90,7 +90,7 @@ async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     
     #결제 내역에 남기기
     purchase_data = models.PurchaseData(
-        user_id=user_data.id,
+        customer_id =user_data.id,
         purchase_type="LOCAL_PAY",
         game_id=game_id,
         item="BUYIN",
@@ -101,6 +101,10 @@ async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     )
     db.add(purchase_data)
     db.commit()
+    
+    import main
+    
+    await main.socket_controller.update_game_data(game)
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
@@ -203,8 +207,7 @@ async def in_game_user_list(game_id: str, db: Session = Depends(get_db)):
     user_list = []
     in_game_user_id_list = []
     for player in game.game_in_player:
-        user_id = player.get("user_id")
-        print(user_id)
+        user_id = player.get("customer_id")
         in_game_user_id_list.append(user_id)
     
     user_list = db.query(models.UserData).filter(models.UserData.id.in_(in_game_user_id_list)).all()
@@ -227,7 +230,7 @@ async def update_user_in_game_sit_statue(game_id: int, user_id: int, is_sit: boo
     
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
     for player in game_in_player:
-        if player.get("user_id") == user_id:
+        if player.get("customer_id") == user_id:
             player["is_sit"] = is_sit
     
     # 명시적으로 DB 업데이트 쿼리 실행
@@ -241,6 +244,10 @@ async def update_user_in_game_sit_statue(game_id: int, user_id: int, is_sit: boo
     # 업데이트 확인을 위해 로그 출력
     print(f"게임 {game_id}의 사용자 {user_id} 자리 상태 업데이트: {is_sit}")
     print(f"업데이트된 게임 플레이어 목록: {game.game_in_player}")
+    
+    import main
+    
+    await main.socket_controller.update_game_data(game)
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
@@ -264,7 +271,7 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
         )
     
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
-    add_in_game_user = InGameUser(user_id=user_id, join_count=1, is_sit=True, is_addon=False).to_json()
+    add_in_game_user = InGameUser(customer_id=user_id, join_count=1, is_sit=True, is_addon=False).to_json()
     game_in_player.append(add_in_game_user)
             
     db.query(models.GameData).filter(models.GameData.id == game_id).update(
@@ -276,7 +283,7 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
     
     #결제 내역에 남기기
     purchase_data = models.PurchaseData(
-        user_id=user_id,
+        customer_id=user_id,
         purchase_type="LOCAL_PAY",
         game_id=game_id,
         item="BUYIN",
@@ -287,6 +294,10 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, db: Session
     )
     db.add(purchase_data)
     db.commit()
+    
+    import main
+    
+    await main.socket_controller.update_game_data(game)
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
@@ -311,7 +322,7 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
     
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
     for player in game_in_player:
-        if player.get("user_id") == user_id:
+        if player.get("customer_id") == user_id:
             player["join_count"] += 1
             
     db.query(models.GameData).filter(models.GameData.id == game_id).update(
@@ -320,7 +331,7 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
     
     #결제 내역에 남기기
     purchase_data = models.PurchaseData(
-        user_id=user_id,
+        customer_id=user_id,
         purchase_type="LOCAL_PAY",
         game_id=game_id,
         item="REBUYIN",
@@ -333,6 +344,10 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
     
     db.commit()
     db.refresh(game)
+    
+    import main
+    
+    await main.socket_controller.update_game_data(game)
 
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
@@ -357,7 +372,7 @@ async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, 
     
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
     for player in game_in_player:
-        if player.get("user_id") == user_id:
+        if player.get("customer_id") == user_id:
             player["is_addon"] = is_addon
             
     # 명시적으로 DB 업데이트 쿼리 실행
@@ -367,7 +382,7 @@ async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, 
     
     #결제 내역에 남기기
     purchase_data = models.PurchaseData(
-        user_id=user_id,
+        customer_id=user_id,
         purchase_type="LOCAL_PAY",
         game_id=game_id,
         item="ADDON",
@@ -380,6 +395,10 @@ async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, 
     
     db.commit()
     db.refresh(game)
+    
+    import main
+    
+    await main.socket_controller.update_game_data(game)
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
     tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
