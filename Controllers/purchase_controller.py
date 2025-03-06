@@ -19,7 +19,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Controllers import user_controller
 import models
 import schemas
-from database import get_db
+from database import get_db, get_db_direct
 
 router = APIRouter(
     prefix="/purchase",
@@ -144,56 +144,51 @@ async def get_purchase_data_by_date(startTime: str, endTime: str, db: Session = 
         )
         
 @router.get("/get-paginated-purchase-data")
-async def get_paginated_purchase_data(
-    page: int = Query(default=1, ge=1, description="페이지 번호"),
-    page_size: int = Query(default=10, ge=1, le=100, description="페이지당 항목 수"),
-    status: Optional[str] = Query(default=None, description="구매 상태 필터"),
-    db: Session = Depends(get_db)
-):
-    # 기본 쿼리 생성
-    query = db.query(models.PurchaseData)
-    
-    # 상태 필터 적용
-    if status:
-        query = query.filter(models.PurchaseData.status == status)
-    
-    # ID 기준 내림차순 정렬 (최신 데이터가 먼저 오도록)
-    query = query.order_by(models.PurchaseData.id.desc())
-    
-    # 전체 아이템 수 계산
-    total_items = query.count()
-    
-    # 페이지네이션 적용
-    skip = (page - 1) * page_size
-    query = query.offset(skip).limit(page_size)
-    
-    # 결과 가져오기
-    purchase_data = query.all()
-    
-    # 응답 데이터 포맷팅
-    return_data = []
-    for data in purchase_data:
-        formatted_data = data.to_json()
-        return_data.append(formatted_data)
-    
-    # 메타데이터 계산
-    total_pages = (total_items + page_size - 1) // page_size
-    
-    return JSONResponse(
-        content={
-            "response": 200,
-            "message": "구매 데이터를 성공적으로 조회했습니다",
-            "data": {
-                "items": return_data,
-                "metadata": {
-                    "current_page": page,
+async def get_paginated_purchase_data(page: int = 1, page_size: int = 20):
+    """페이지네이션된 구매 데이터 조회"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 모든 구매 데이터 조회
+        query = db.query(models.PurchaseData)
+        
+        # 총 레코드 수 계산
+        total_records = query.count()
+        
+        # 페이지네이션 적용
+        query = query.order_by(models.PurchaseData.purchased_at.desc())
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        
+        # 결과 가져오기
+        purchase_data = query.all()
+        
+        # 총 페이지 수 계산
+        total_pages = (total_records + page_size - 1) // page_size
+        
+        # 결과 포맷팅
+        result = []
+        for item in purchase_data:
+            purchase_json = item.to_json()
+            purchase_json["purchased_at"] = purchase_json["purchased_at"].isoformat()
+            result.append(purchase_json)
+        
+        return JSONResponse(
+            content={
+                "response": 200, 
+                "data": {
+                    "items": result,
+                    "page": page,
                     "page_size": page_size,
-                    "total_items": total_items,
                     "total_pages": total_pages,
-                    "has_next": page < total_pages,
-                    "has_previous": page > 1
+                    "total_records": total_records
                 }
-            }
-        },
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+            },
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()

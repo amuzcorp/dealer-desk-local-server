@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import models
 import schemas
-from database import get_db
+from database import get_db, get_db_direct
 from dataclasses import dataclass
 @dataclass
 class InGameUser:
@@ -38,25 +38,233 @@ router = APIRouter(
 )
 
 @router.get("/get-user-list")
-async def get_user_list(db: Session = Depends(get_db)):
-    user_list = db.query(models.UserData).filter(models.UserData.phone_number != None).all()
-    user_list_json = []
-    for user in user_list:
-        user_list_json.append(user.to_json())
-    return JSONResponse(
-        content={"response": 200, "message": "User list", "data": user_list_json},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+async def get_user_list():
+    """전화번호가 있는 모든 사용자 조회"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        user_list = db.query(models.UserData).filter(models.UserData.phone_number != None).all()
+        
+        if not user_list:
+            return JSONResponse(
+                content={"response": 201, "message": "사용자를 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        json_data_users = []
+        for user in user_list:
+            user_json = user.to_json()
+            
+            # 시간 포맷 변환
+            user_json["register_at"] = user_json["register_at"].isoformat()
+            user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+            
+            json_data_users.append(user_json)
+            
+        return JSONResponse(
+            content={"response": 200, "data": json_data_users},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
 @router.get("/get-all-user-list")
-async def get_all_user_list(db: Session = Depends(get_db)):
-    user_list = db.query(models.UserData).all()
-    user_list_json = []
-    for user in user_list:
-        user_list_json.append(user.to_json())
-    return JSONResponse(
-        content={"response": 200, "message": "User list", "data": user_list_json},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+async def get_all_user_list():
+    """모든 사용자 조회 (전화번호 필터 없음)"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        user_list = db.query(models.UserData).all()
+        
+        if not user_list:
+            return JSONResponse(
+                content={"response": 201, "message": "사용자를 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        json_data_users = []
+        for user in user_list:
+            user_json = user.to_json()
+            
+            # 시간 포맷 변환
+            user_json["register_at"] = user_json["register_at"].isoformat()
+            user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+            
+            json_data_users.append(user_json)
+            
+        return JSONResponse(
+            content={"response": 200, "data": json_data_users},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
+@router.get("/get-user/{user_id}")
+async def get_user(user_id: int):
+    """특정 사용자 조회"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        user = db.query(models.UserData).filter(models.UserData.id == user_id).first()
+        
+        if not user:
+            return JSONResponse(
+                content={"response": 404, "message": "사용자를 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        user_json = user.to_json()
+        
+        # 시간 포맷 변환
+        user_json["register_at"] = user_json["register_at"].isoformat()
+        user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+        
+        return JSONResponse(
+            content={"response": 200, "data": user_json},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
+@router.post("/create-user")
+async def create_user(user_data: schemas.UserDataCreate):
+    """사용자 생성"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        user = models.UserData(
+            name=user_data.name,
+            phone_number=user_data.phone_number,
+            regist_mail=user_data.regist_mail,
+            game_join_count=user_data.game_join_count,
+            visit_count=user_data.visit_count,
+            register_at=user_data.register_at,
+            last_visit_at=user_data.last_visit_at,
+            point=user_data.point,
+            total_point=user_data.total_point,
+            remark=user_data.remark,
+            awarding_history=user_data.awarding_history,
+            point_history=user_data.point_history
+        )
+        
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        
+        user_json = user.to_json()
+        
+        # 시간 포맷 변환
+        user_json["register_at"] = user_json["register_at"].isoformat()
+        user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+        
+        return JSONResponse(
+            content={"response": 200, "message": "사용자가 생성되었습니다", "data": user_json},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
+@router.put("/update-user/{user_id}")
+async def update_user(user_id: int, user_data: schemas.UserDataUpdate):
+    """사용자 정보 업데이트"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        user = db.query(models.UserData).filter(models.UserData.id == user_id).first()
+        
+        if not user:
+            return JSONResponse(
+                content={"response": 404, "message": "사용자를 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        # 사용자 정보 업데이트
+        user.name = user_data.name
+        user.phone_number = user_data.phone_number
+        user.regist_mail = user_data.regist_mail
+        user.game_join_count = user_data.game_join_count
+        user.visit_count = user_data.visit_count
+        user.register_at = user_data.register_at
+        user.last_visit_at = user_data.last_visit_at
+        user.point = user_data.point
+        user.total_point = user_data.total_point
+        user.remark = user_data.remark
+        user.awarding_history = user_data.awarding_history
+        user.point_history = user_data.point_history
+        
+        db.commit()
+        db.refresh(user)
+        
+        user_json = user.to_json()
+        
+        # 시간 포맷 변환
+        user_json["register_at"] = user_json["register_at"].isoformat()
+        user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+        
+        return JSONResponse(
+            content={"response": 200, "message": "사용자 정보가 업데이트되었습니다", "data": user_json},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
+@router.delete("/delete-user/{user_id}")
+async def delete_user(user_id: int):
+    """사용자 삭제"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        user = db.query(models.UserData).filter(models.UserData.id == user_id).first()
+        
+        if not user:
+            return JSONResponse(
+                content={"response": 404, "message": "사용자를 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        db.delete(user)
+        db.commit()
+        
+        return JSONResponse(
+            content={"response": 200, "message": "사용자가 삭제되었습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
 @router.put("/create-guest-user/{game_id}")
 async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
     user_data = models.UserData(
@@ -118,41 +326,6 @@ async def create_guest_user(game_id: str, db: Session = Depends(get_db)):
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
 
-@router.post("/create-user-data")
-async def create_user_data(user_data: schemas.UserDataCreate, db: Session = Depends(get_db)):
-    try:
-        # 네, id 값은 데이터베이스에서 자동으로 생성됩니다.
-        # UserData 모델에서 id는 자동 증가(auto-increment) 필드로 설정되어 있습니다.
-        db_user_data = models.UserData(**user_data.model_dump())
-        db.add(db_user_data)
-        db.commit()
-        db.refresh(db_user_data)  # 이 단계에서 자동 생성된 id 값이 db_user_data에 반영됩니다
-        return JSONResponse(
-            content={"response": 200, "message": "User created", "data": db_user_data.to_json()}, 
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )
-    except Exception as e:
-        return JSONResponse(
-            content={"response": 500, "message": "User creation failed", "data": str(e)}, 
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )
-
-@router.post("/update-user-data")
-async def update_user_data(user_data: schemas.UserDataUpdate, db: Session = Depends(get_db)):
-    db_user_data = db.query(models.UserData).filter(models.UserData.id == user_data.id).first()
-    if not db_user_data:
-        return JSONResponse(
-            content={"response": 404, "message": "User not found"},
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )
-    db.query(models.UserData).filter(models.UserData.id == user_data.id).update(user_data.model_dump())
-    db.commit()
-    db.refresh(db_user_data)
-    return JSONResponse(
-        content={"response": 200, "message": "User updated", "data": db_user_data.to_json()},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
-    
 @router.post("/add-point-for-user")
 async def add_point_for_user(body: dict, db: Session = Depends(get_db)):
     user_id = body.get("user_id")
@@ -271,8 +444,15 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase
         )
     
     game_in_player = game.game_in_player.copy() if game.game_in_player else []
-    add_in_game_user = InGameUser(customer_id=user_id, join_count=1, is_sit=True, is_addon=False).to_json()
-    game_in_player.append(add_in_game_user)
+    is_found = False;
+    for player in game_in_player:
+        if player.get("customer_id") == user_id:
+            player["join_count"] += 1
+            is_found = True
+            
+    if not is_found:
+        add_in_game_user = InGameUser(customer_id=user_id, join_count=1, is_sit=True, is_addon=False).to_json()
+        game_in_player.append(add_in_game_user)
             
     db.query(models.GameData).filter(models.GameData.id == game_id).update(
         {"game_in_player": game_in_player}

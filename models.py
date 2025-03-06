@@ -196,6 +196,7 @@ class UserData(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
+    uuid = Column(String, index=True)
     phone_number = Column(String, index=True, nullable=True)
     regist_mail = Column(String, nullable=True)
     game_join_count = Column(Integer, default=0)
@@ -212,6 +213,7 @@ class UserData(Base):
         return {
             "id": self.id,
             "name": self.name,
+            "uuid": self.uuid,
             "phone_number": self.phone_number,
             "regist_mail": self.regist_mail,
             "game_join_count": self.game_join_count,

@@ -7,13 +7,14 @@ import models, schemas, database
 import dataclasses
 from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller
 
-# 데이터베이스 테이블 생성
-models.Base.metadata.create_all(bind=database.engine)
+# 데이터베이스 테이블 생성은 매장별로 처리되므로 여기서는 제거
+# models.Base.metadata.create_all(bind=database.engine)
 
 # 테스트 구매 데이터 생성
 # database.create_test_purchase_data()
 
-# 임의 플레이어 데이터 추가
+# # 임의 플레이어 데이터 추가
+# database.add_player_data()
 
 app = FastAPI(
     title="FastAPI Project",
@@ -29,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 매장 ID 미들웨어 추가
+app.add_middleware(database.StoreIDMiddleware)
 
 # 라우터 등록
 app.include_router(table_controller.router)
@@ -54,23 +58,74 @@ class LoginData:
     user_id: str
     user_pwd: str
 
+@dataclasses.dataclass
+class StoreSelectData:
+    store_id: int
+
 @app.post("/login")
 async def login(login_data: LoginData):
     global socket_controller
     try:
         success = await socket_controller.main(user_id=login_data.user_id, user_pwd=login_data.user_pwd)
         if success:
-            print("소켓 컨트롤러가 성공적으로 초기화되었습니다")
-            return {"status": "success", "store_name": socket_controller.store_name}
+            print("로그인 성공")
+            
+            # 로그인 성공 시 각 매장별 데이터베이스 초기화
+            store_ids = []
+            for store in socket_controller.stores:
+                store_id = store['id']
+                store_ids.append(store_id)
+                db_init_success = database.initialize_store_database(store_id)
+                if db_init_success:
+                    print(f"매장 {store['name']}의 데이터베이스가 초기화되었습니다")
+                else:
+                    print(f"매장 {store['name']}의 데이터베이스 초기화 실패")
+                    return {"status": "error", "message": f"매장 {store['name']}의 데이터베이스 초기화 실패"}
+            
+            # 오프라인 모드 여부와 매장 정보 반환
+            return {
+                "status": "success",
+                "is_offline_mode": socket_controller.is_offline_mode,
+                "stores": socket_controller.stores,
+                "store_ids": store_ids
+            }
         else:
-            print("소켓 컨트롤러 초기화 실패")
-            return {"status": "failed", "message": "소켓 연결 또는 인증 실패"}
+            print("로그인 실패")
+            return {"status": "failed", "message": "로그인 실패"}
     except Exception as e:
         error_message = str(e)
-        print(f"소켓 컨트롤러 초기화 중 오류 발생: {error_message}")
+        print(f"로그인 중 오류 발생: {error_message}")
         if "인증 실패" in error_message:
             return {"status": "failed", "message": error_message, "code": "AUTH_ERROR"}
         socket_controller = None
+        return {"status": "error", "message": error_message}
+
+@app.post("/select-store")
+async def select_store(store_data: StoreSelectData):
+    """매장 선택 및 소켓 연결 엔드포인트"""
+    global socket_controller
+    try:
+        if socket_controller is None:
+            return {"status": "error", "message": "로그인이 필요합니다"}
+            
+        # 현재 매장 ID 설정
+        database.set_current_store_id(store_data.store_id)
+        
+        success = await socket_controller.select_store(store_data.store_id)
+        if success:
+            selected_store = socket_controller.selected_store
+            return {
+                "status": "success",
+                "store_name": selected_store['name'],
+                "tenant_id": selected_store['tenant_id'],
+                "is_offline_mode": socket_controller.is_offline_mode,
+                "is_connected": socket_controller.is_connected and socket_controller.is_subscribed
+            }
+        else:
+            return {"status": "failed", "message": "매장 선택 실패"}
+    except Exception as e:
+        error_message = str(e)
+        print(f"매장 선택 중 오류 발생: {error_message}")
         return {"status": "error", "message": error_message}
 
 @app.post("/re-connect-central-socket")

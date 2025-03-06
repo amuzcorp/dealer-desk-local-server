@@ -55,15 +55,18 @@ class AuthDeviceData(DeviceDataBase):
     class Config:
         from_attributes = True 
 
-class RequestDeviceData(DeviceDataBase):
+class RequestDeviceData(BaseModel):
+    device_uid: str
+    device_name: str
     connect_status: str
-    request_time: Optional[datetime] = datetime.now()
-    update_time: Optional[datetime] = datetime.now()
-    
-    class Config:
-        from_attributes = True 
-        
-        
+
+class ConnectTableData(BaseModel):
+    device_uid: str
+    table_id: int
+
+class DisconnectTableData(BaseModel):
+    device_uid: str
+
 class PresetDataBase(BaseModel):
     title: str
     payment_chip: int

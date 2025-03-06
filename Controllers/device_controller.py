@@ -15,7 +15,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import models
 import schemas
-from database import get_db
+from database import get_db, get_db_direct
 
 @dataclass
 class DeviceNameChangeData:
@@ -66,7 +66,7 @@ async def update_auth_device_status(device_uid: str, is_connected: bool, db: Ses
         print(f"Error updating device status: {e}")
 
 @router.websocket("/ws") 
-async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
+async def websocket_endpoint(websocket: WebSocket):
     """
     WebSocket 엔드포인트 - 디바이스 연결 및 인증 처리
     """
@@ -77,6 +77,9 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
     # 디바이스 데이터 수신
     device_datas_message = await websocket.receive_text()
     device_data_json = json.loads(device_datas_message)
+    
+    # 직접 세션 가져오기
+    db = get_db_direct()
     
     try:
         # 디바이스 데이터 모델 생성
@@ -119,7 +122,7 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
         device_socket_data.append(DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket))
         # 2초간 대기
         await asyncio.sleep(2)
-        await connect_table_device_socket_event(device_data.device_uid, db)
+        await connect_table_device_socket_event(device_data.device_uid)
         if(auth_device):
             await update_auth_device_status(auth_device.device_uid, True, db)
         
@@ -146,9 +149,13 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
 
         if auth_device:
             await update_auth_device_status(auth_device.device_uid, False, db)
+    finally:
+        db.close()
 
 @router.get("/get-waiting-device")
-async def get_waiting_device(db: Session = Depends(get_db)):
+async def get_waiting_device():
+    # 직접 세션 가져오기
+    db = get_db_direct()
     try:
         waiting_device = db.query(models.RequestDeviceData).filter(
             models.RequestDeviceData.connect_status == "waiting"
@@ -177,264 +184,372 @@ async def get_waiting_device(db: Session = Depends(get_db)):
             content={"response": 500, "error": str(e)},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
+    finally:
+        db.close()
 
 @router.get("/get-auth-device")
-async def get_auth_device(db: Session = Depends(get_db)):
-    auth_device = db.query(models.AuthDeviceData).all()
-    auth_device_list = []
-    for device in auth_device:
-        device_json = device.to_json()
-        device_json["created_at"] = device_json["created_at"].isoformat()
-        auth_device_list.append(device_json)
-        
-    return JSONResponse(
-        content={"response": 200, "data": auth_device_list},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+async def get_auth_device():
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        auth_device = db.query(models.AuthDeviceData).all()
+        auth_device_list = []
+        for device in auth_device:
+            device_json = device.to_json()
+            device_json["created_at"] = device_json["created_at"].isoformat()
+            auth_device_list.append(device_json)
+            
+        return JSONResponse(
+            content={"response": 200, "data": auth_device_list},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
 
 @router.post("/auth-device")
-async def auth_device(device_data: schemas.RequestDeviceData, db: Session = Depends(get_db)):
-    # 요청된 디바이스 찾기
-    request_device = db.query(models.RequestDeviceData).filter(
-        models.RequestDeviceData.device_uid == device_data.device_uid,
-        models.RequestDeviceData.connect_status == "waiting"
-    ).first()
-    
-    if not request_device:
+async def auth_device(device_data: schemas.RequestDeviceData):
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 요청된 디바이스 찾기
+        request_device = db.query(models.RequestDeviceData).filter(
+            models.RequestDeviceData.device_uid == device_data.device_uid,
+            models.RequestDeviceData.connect_status == "waiting"
+        ).first()
+        
+        if not request_device:
+            return JSONResponse(
+                content={"response": 404, "message": "Device not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        # 승인 요청인 경우
+        if device_data.connect_status == "approved":
+            # 인증된 디바이스로 등록
+            auth_device = models.AuthDeviceData(
+                device_uid=request_device.device_uid,
+                device_name=request_device.device_name,
+                is_connected=True
+            )
+            db.add(auth_device)
+            
+            # 요청 디바이스 삭제
+            db.delete(request_device)
+            db.commit()
+            
+            return JSONResponse(
+                content={"response": 200, "message": "Device authorized successfully"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 거절 요청인 경우 
+        elif device_data.connect_status == "rejected":
+            request_device.connect_status = "rejected"
+            db.commit()
+            
+            return JSONResponse(
+                content={"response": 200, "message": "Device rejected"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
         return JSONResponse(
-            content={"response": 404, "message": "Device not found"},
+            content={"response": 400, "message": "Invalid status"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
-    
-    # 승인 요청인 경우
-    if device_data.connect_status == "approved":
-        # 인증된 디바이스로 등록
-        auth_device = models.AuthDeviceData(
-            device_uid=request_device.device_uid,
-            device_name=request_device.device_name,
-            is_connected=True
-        )
-        db.add(auth_device)
-        
-        # 요청 디바이스 삭제
-        db.delete(request_device)
-        db.commit()
-        
-        return JSONResponse(
-            content={"response": 200, "message": "Device authorized successfully"},
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )
-        
-    # 거절 요청인 경우 
-    elif device_data.connect_status == "rejected":
-        request_device.connect_status = "rejected"
-        db.commit()
-        
-        return JSONResponse(
-            content={"response": 200, "message": "Device rejected"},
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )
-        
-    return JSONResponse(
-        content={"response": 400, "message": "Invalid status"},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+    finally:
+        db.close()
 
-@router.get("/get-waiting-device")
-async def get_waiting_device(db: Session = Depends(get_db)):
-    waiting_device = db.query(models.RequestDeviceData).filter(
-        models.RequestDeviceData.connect_status == "waiting"
-    ).all()
-    
-    device_list = []
-    for device in waiting_device:
-        device_json = device.to_json()
-        device_json["request_time"] = device_json["request_time"].isoformat()
-        device_json["update_time"] = device_json["update_time"].isoformat()
-        device_list.append(device_json)
-            
-    device_list.sort(key=lambda x: x["request_time"])
-            
-    return JSONResponse(
-        content={"response": 200, "data": device_list},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )    
- 
 @router.post("/device-name-change")
-async def device_name_change(device_data: DeviceNameChangeData, db: Session = Depends(get_db)):
-    auth_device = db.query(models.AuthDeviceData).filter(
-        models.AuthDeviceData.device_uid == device_data.device_uid
-    ).first()
-    
-    if not auth_device: 
+async def device_name_change(device_data: DeviceNameChangeData):
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 디바이스 이름 길이 검증
+        if len(device_data.device_name) > MAX_DEVICE_NAME_LENGTH:
+            return JSONResponse(
+                content={"response": 400, "message": f"Device name too long. Maximum length is {MAX_DEVICE_NAME_LENGTH} characters."},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 인증된 디바이스 찾기
+        auth_device = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.device_uid == device_data.device_uid
+        ).first()
+        
+        if not auth_device:
+            return JSONResponse(
+                content={"response": 404, "message": "Device not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 디바이스 이름 변경
+        auth_device.device_name = device_data.device_name
+        db.commit()
+        
         return JSONResponse(
-            content={"response": 404, "message": "Device not found"},
+            content={"response": 200, "message": "Device name changed successfully"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
-    
-    if len(device_data.device_name) > MAX_DEVICE_NAME_LENGTH:
-        return JSONResponse(
-            content={"response": 400, "message": "Device name is too long"},
-            headers={"Content-Type": "application/json; charset=utf-8"}
-        )
-    
-    auth_device.device_name = device_data.device_name
-    db.commit()
-    
-    return JSONResponse(
-        content={"response": 200, "message": "Device name changed successfully"},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+    finally:
+        db.close()
 
 @router.delete("/device-delete/{device_uid}")
-async def device_delete(device_uid: str, db: Session = Depends(get_db)):
-    auth_device = db.query(models.AuthDeviceData).filter(
-        models.AuthDeviceData.device_uid == device_uid
-    ).first()
-    
-    if not auth_device:
+async def device_delete(device_uid: str):
+    """디바이스 삭제"""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        auth_device = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.device_uid == device_uid
+        ).first()
+        
+        if not auth_device:
+            return JSONResponse(
+                content={"response": 404, "message": "Device not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        db.delete(auth_device)
+        db.commit()
+        
+        await send_delete_device_socket_event(device_uid)
+        
         return JSONResponse(
-            content={"response": 404, "message": "Device not found"},
+            content={"response": 200, "message": "Device deleted successfully"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
-    
-    db.delete(auth_device)
-    db.commit()
-    
-    return JSONResponse(
-        content={"response": 200, "message": "Device deleted successfully"},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
+    finally:
+        db.close()
 
-@router.post("/connect-table-device")
-async def connect_table_device(device_uid: str, table_id: str = None, db: Session = Depends(get_db)):
-    device_data = db.query(models.AuthDeviceData).filter(
-        models.AuthDeviceData.device_uid == device_uid
-    ).first()
-    
-    if not device_data:
+@router.post("/connect-table")
+async def connect_table(device_data: schemas.ConnectTableData):
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 인증된 디바이스 찾기
+        auth_device = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.device_uid == device_data.device_uid
+        ).first()
+        
+        if not auth_device:
+            return JSONResponse(
+                content={"response": 404, "message": "Device not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 테이블 찾기
+        table = db.query(models.TableData).filter(
+            models.TableData.id == device_data.table_id
+        ).first()
+        
+        if not table:
+            return JSONResponse(
+                content={"response": 404, "message": "Table not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 디바이스를 테이블에 연결
+        auth_device.connect_table_id = table.id
+        db.commit()
+        
+        # 소켓 연결 업데이트
+        await connect_table_device_socket_event(device_data.device_uid)
+        
         return JSONResponse(
-            content={"response": 404, "message": "Device not found"},
+            content={"response": 200, "message": "Device connected to table successfully"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
-    
-    device_data.connect_table_id = table_id
-    print(f"디바이스 연결 테이블 ID: {device_data.connect_table_id}")
-    db.commit()
-    
-    await connect_table_device_socket_event(device_uid, db)
-    
-    return JSONResponse(
-        content={"response": 200, "message": "Device connected to table successfully"},
-        headers={"Content-Type": "application/json; charset=utf-8"}
-    )
-    
-    
-async def connect_table_device_socket_event(device_uid: str, db: Session = Depends(get_db)):
-    # 디바이스 데이터 찾기
-    device_data = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.device_uid == device_uid).first()
-    
-    if(device_data.connect_table_id == None):
-        # 테이블 연결 해제
-        # uid에 해당하는 소켓 찾기
+    finally:
+        db.close()
+
+@router.post("/disconnect-table")
+async def disconnect_table(device_data: schemas.DisconnectTableData):
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 인증된 디바이스 찾기
+        auth_device = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.device_uid == device_data.device_uid
+        ).first()
+        
+        if not auth_device:
+            return JSONResponse(
+                content={"response": 404, "message": "Device not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 디바이스 연결 해제
+        auth_device.connect_table_id = None
+        db.commit()
+        
+        # 소켓 연결 업데이트
+        await disconnect_table_device_socket_event(device_data.device_uid)
+        
+        return JSONResponse(
+            content={"response": 200, "message": "Device disconnected from table successfully"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
+@router.delete("/delete-auth-device/{device_id}")
+async def delete_auth_device(device_id: int):
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 인증된 디바이스 찾기
+        auth_device = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.id == device_id
+        ).first()
+        
+        if not auth_device:
+            return JSONResponse(
+                content={"response": 404, "message": "Device not found"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 디바이스 삭제
+        db.delete(auth_device)
+        db.commit()
+        
+        return JSONResponse(
+            content={"response": 200, "message": "Device deleted successfully"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
+async def connect_table_device_socket_event(device_uid: str):
+    """
+    디바이스를 테이블에 연결하는 이벤트 처리
+    """
+    try:
+        # 직접 세션 가져오기
+        db = get_db_direct()
+        try:
+            # 인증된 디바이스 찾기
+            auth_device = db.query(models.AuthDeviceData).filter(
+                models.AuthDeviceData.device_uid == device_uid
+            ).first()
+            
+            if not auth_device or not auth_device.connect_table_id:
+                return
+                
+            # 테이블 찾기
+            table = db.query(models.TableData).filter(
+                models.TableData.id == auth_device.connect_table_id
+            ).first()
+            
+            if not table:
+                return
+                
+            # 디바이스 소켓 찾기
+            device_socket = next(
+                (socket for socket in device_socket_data if socket.device_uid == device_uid),
+                None
+            )
+            
+            if device_socket:
+                device_socket.table_title = table.table_title
+                await send_socket_message(
+                    device_socket.device_socket,
+                    200,
+                    {
+                        "event": "connect_table",
+                        "table_title": table.table_title
+                    }
+                )
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Error in connect_table_device_socket_event: {e}")
+
+async def disconnect_table_device_socket_event(device_uid: str):
+    """
+    디바이스를 테이블에서 연결 해제하는 이벤트 처리
+    """
+    try:
         # 디바이스 소켓 찾기
         device_socket = next(
             (socket for socket in device_socket_data if socket.device_uid == device_uid),
             None
         )
         
-        # 소켓이 존재하면 연결 해제 메시지 전송
         if device_socket:
-            device_socket.table_title = ""
-            device_data.connect_table_id = None
-            db.commit()
-            disconnect_message = {
-                "response": 200,
-                "data": "table_disconnect"
-            }
-            await device_socket.device_socket.send_text(json.dumps(disconnect_message))
-        
-        return
-    
-    # 테이블 찾기
-    # 테이블 데이터 조회 
-    table_data = db.query(models.TableData).filter(
-        models.TableData.id == device_data.connect_table_id
-    ).first()
-    
-    # 디버깅을 위한 로그 출력
-    # print(f"테이블 데이터: {table_data}")
-    # print(f"연결할 테이블 ID: {device_data.connect_table_id}")
-    # print(f"테이블 데이터 타입: {type(table_data)}")
-    # print(f"테이블 데이터 타입: {table_data.table_title}")
-    
-    if table_data is None:
-        print("테이블 데이터가 없습니다.")
-        disconnect_message = {
-                "response": 200,
-                "data": "table_disconnect"
-            }
-        for device in device_socket_data:
-            if device.device_uid == device_uid:
-                await device.device_socket.send_text(json.dumps(disconnect_message))
-                break
-        return
-    
-    # 테이블 타이틀 받기
-    table_title = table_data.table_title
-    
+            device_socket.table_title = None
+            await send_socket_message(
+                device_socket.device_socket,
+                200,
+                {
+                    "event": "disconnect_table"
+                }
+            )
+    except Exception as e:
+        print(f"Error in disconnect_table_device_socket_event: {e}")
+
+async def send_delete_device_socket_event(device_uid: str):
+    """디바이스 삭제 시 소켓 연결 해제"""
     for device in device_socket_data:
         if device.device_uid == device_uid:
-            await device.device_socket.send_text(json.dumps({
-                "response": 200,
-                "data" : "connect_table",
-                "table_title" : table_title
-            }))
-            await asyncio.sleep(1)
-            await send_connect_game_socket_event(device_uid, device_data.connect_table_id, db)
+            await device.device_socket.close()
+            del device_socket_data[device_socket_data.index(device)]
             break
 
-
-async def send_connect_game_socket_event(device_uid: str, table_id: str, db: Session = Depends(get_db)):
-    table_data = db.query(models.TableData).filter(
-        models.TableData.id == table_id
-    ).first()
-    
-    game_id = table_data.game_id
-    if(game_id == None):
-        disconnect_message = {
-            "response": 200,
-            "data": "game_disconnect"
-        }
-        for device in device_socket_data:
-            if device.device_uid == device_uid:
-                await device.device_socket.send_text(json.dumps(disconnect_message))
-                break
-        return
-    
-    game_data = db.query(models.GameData).filter(
-        models.GameData.id == game_id
-    ).first()
-    
-    game_data_json = {
-        "response": 200,
-        "data" : "game_connect",
-        "game_data" : game_data.to_json()
-    }
-    
-    for device in device_socket_data:
-        print(device.device_uid)
-        print(device_uid)
-        print(device.device_uid == device_uid)
-        print(device.device_socket)
-        if device.device_uid == device_uid:
-            if device.device_socket is None:
-                print(f"디바이스 {device_uid}의 소켓이 연결되어 있지 않습니다")
-                continue
-            try:
-                print(f"디바이스 {device_uid}에 게임 연결 이벤트 전송")
-                await device.device_socket.send_text(json.dumps(game_data_json))
-            except Exception as e:
-                print(f"디바이스 {device_uid}에 메시지 전송 중 오류 발생: {str(e)}")
-            break
-    
+async def send_connect_game_socket_event(device_uid: str, table_id: str):
+    """
+    디바이스에 게임 연결 이벤트를 전송합니다.
+    """
+    try:
+        # 직접 세션 가져오기
+        db = get_db_direct()
+        try:
+            # 테이블 데이터 조회
+            table_data = db.query(models.TableData).filter(models.TableData.id == table_id).first()
+            
+            if not table_data:
+                print(f"테이블을 찾을 수 없음: {table_id}")
+                return
+                
+            game_id = table_data.game_id
+            
+            # 게임 데이터가 없는 경우 연결 해제 메시지 전송
+            if not game_id:
+                # 디바이스 소켓 찾기
+                for device in device_socket_data:
+                    if device.device_uid == device_uid:
+                        await send_socket_message(
+                            device.device_socket,
+                            200,
+                            {
+                                "event": "game_disconnect"
+                            }
+                        )
+                        break
+                return
+                
+            # 게임 데이터 조회
+            game_data = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+            
+            if not game_data:
+                print(f"게임을 찾을 수 없음: {game_id}")
+                return
+                
+            # 디바이스 소켓 찾기
+            for device in device_socket_data:
+                if device.device_uid == device_uid:
+                    try:
+                        await send_socket_message(
+                            device.device_socket,
+                            200,
+                            {
+                                "event": "game_connect",
+                                "game_data": game_data.to_json()
+                            }
+                        )
+                    except Exception as e:
+                        print(f"디바이스 {device_uid}에 메시지 전송 중 오류: {e}")
+                    break
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"게임 연결 이벤트 처리 중 오류: {e}")

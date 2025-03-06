@@ -1,8 +1,7 @@
-# 딜러 데스크 로컬 서버
+# Dealer Desk Local Server
 
-딜러 데스크 시스템의 로컬 백엔드 서버 애플리케이션입니다.
-
-## 프로젝트 구조
+## 개요
+딜러 데스크 로컬 서버는 매장별 데이터를 관리하고 중앙 서버와 통신하는 로컬 서버입니다.
 
 ## 설치 및 실행
 
@@ -60,3 +59,69 @@ python central_socket.py
 - `/presets` - 프리셋 관리
 - `/games` - 게임 관리
 - `/purchases` - 구매 관리 
+
+## API 사용 방법
+
+### 1. 로그인
+```
+POST /login
+```
+요청 본문:
+```json
+{
+  "user_id": "이메일",
+  "user_pwd": "비밀번호"
+}
+```
+응답:
+```json
+{
+  "status": "success",
+  "is_offline_mode": false,
+  "stores": [
+    {
+      "id": 1,
+      "name": "매장1",
+      "tenant_id": "xxx",
+      ...
+    }
+  ],
+  "store_ids": [1]
+}
+```
+
+### 2. 매장 선택
+```
+POST /select-store
+```
+요청 본문:
+```json
+{
+  "store_id": 1
+}
+```
+응답:
+```json
+{
+  "status": "success",
+  "store_name": "매장1",
+  "tenant_id": "xxx",
+  "is_offline_mode": false,
+  "is_connected": true
+}
+```
+
+### 3. API 요청 시 매장 ID 헤더 포함
+매장 선택 후 모든 API 요청에는 `X-Store-ID` 헤더를 포함해야 합니다.
+
+예시:
+```
+GET /devices/get-auth-device
+X-Store-ID: 1
+```
+
+## 오프라인 모드
+중앙 서버와 연결이 끊어진 경우에도 로컬 서버는 오프라인 모드로 동작합니다. 이전에 로그인한 계정 정보가 저장되어 있으면 오프라인 모드로 로그인이 가능합니다.
+
+## 데이터베이스
+각 매장별로 독립적인 데이터베이스가 `./databases` 디렉토리에 생성됩니다. 데이터베이스 파일명은 `store_{store_id}.db` 형식입니다. 

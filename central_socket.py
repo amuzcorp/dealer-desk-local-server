@@ -1,14 +1,17 @@
 import asyncio
 from datetime import datetime
+import certifi
 import websockets
 import aiohttp
 import json
 import logging
 import os
 from pathlib import Path
-from database import get_db
+from database import get_db_direct
 from models import PurchaseData
 import models
+import ssl
+from auth_manager import AuthManager
 
 # 로거 설정
 logger = logging.getLogger('ReverbTestController')
@@ -17,7 +20,13 @@ handler = logging.StreamHandler()
 formatter = logging.Formatter('%(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-db = next(get_db())
+
+# SSL 인증서 검증을 비활성화하는 컨텍스트 생성
+ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
+ssl_context.check_hostname = False
+ssl_context.verify_mode = ssl.CERT_NONE
 
 class MessageQueueManager:
     """메시지 큐를 관리하는 클래스"""
@@ -85,59 +94,138 @@ class MessageQueueManager:
 class ReverbTestController:
     socket_id = ""
     is_connected:bool = False
-    is_subscribed:bool = False  # 채널 구독 상태를 추적하는 플래그 추가
+    is_subscribed:bool = False
     message_queue = []
     websocket = None
     user_id = ""
     user_pwd = ""
     tenant_id = ""
     is_handling_message = False
-    auth_event = None  # 인증 완료를 추적하기 위한 이벤트
+    auth_event = None
     store_name = ""
-    _listening_task = None  # 메시지 수신 태스크를 추적하기 위한 변수
+    stores = []
+    selected_store = None  # 선택된 매장 정보
+    _listening_task = None
+    _reconnect_attempts = 0
+    MAX_RECONNECT_ATTEMPTS = 5
     
     def __init__(self):
         self.bearer_token = ""
-        self.login_uri = "http://127.0.0.1:8000/api/login"
-        self.channel_name = "private-admin_penal_" 
-        self.server_url = "ws://192.168.200.115:6001/app/zyyqa9xa1labneonsu90"
-        self.auth_event = asyncio.Event()  # 인증 이벤트 초기화
-        self.queue_manager = MessageQueueManager()  # 메시지 큐 매니저 초기화
-        # logger.debug('ReverbTestController 초기화')
-        # asyncio.run(self.main())
+        self.channel_name = "private-admin_penal_"
+        self.is_ssl = True
+        self.base_url = "dealer-desk.dev.amuz.kr"
+        self.server_url = f"{'wss' if self.is_ssl else 'ws'}://{self.base_url}/app/hyx4ylczjr3sndkwqx8u"
+        self.auth_event = asyncio.Event()
+        self.queue_manager = MessageQueueManager()
+        self.auth_manager = AuthManager()
+        self.is_offline_mode = False
 
     async def request_auth(self):
         """인증 요청을 수행하는 메서드"""
         try:
             logger.debug(f'로그인 시도 - User ID: {self.user_id}, User PWD: {self.user_pwd}')
-            async with aiohttp.ClientSession() as session:
-                auth_data = { 
-                    "email": self.user_id,
-                    "password": self.user_pwd
-                }
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json'
-                }
-                logger.debug('로그인 시도')
-                async with session.post(
-                    "http://192.168.200.115:8000/api/login",
-                    json=auth_data,
-                    headers=headers
-                ) as response:
-                    data = await response.json()
-                    print(data)
-                    if 'token' in data:
-                        self.bearer_token = data['token']
-                        self.tenant_id = data['stores'][0]['tenant_id']
-                        self.store_name = data['stores'][0]['name']
-                        logger.debug(f'Bearer Token: {self.bearer_token}')
-                        return data
-                    else:
-                        logger.error('토큰이 응답에 없습니다. 인증 실패')
-                        return False
+            
+            # 저장된 인증 데이터 확인
+            saved_auth = self.auth_manager.load_auth_data()
+            if saved_auth:
+                if saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
+                    logger.info('저장된 인증 정보로 오프라인 로그인 시도')
+                    self.stores = saved_auth['stores']
+                    self.is_offline_mode = True
+                    return {"token": "offline_mode", "stores": self.stores}
+            
+            # 온라인 인증 시도
+            try:
+                async with aiohttp.ClientSession() as session:
+                    auth_data = { 
+                        "email": self.user_id,
+                        "password": self.user_pwd
+                    }
+                    headers = {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    }
+                    logger.debug('온라인 로그인 시도')
+                    async with session.post(
+                        f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/login",
+                        json=auth_data,
+                        headers=headers,
+                        ssl=ssl_context if self.is_ssl else None
+                    ) as response:
+                        data = await response.json()
+                        print(data)
+                        if data:
+                            # 성공적인 온라인 인증 시 데이터 저장
+                            self.bearer_token = data['token']
+                            logger.info(f'bearer_token: {self.bearer_token}')
+                            if self.bearer_token == None:
+                                raise Exception("토큰이 없습니다.")
+                            self.stores = data['stores']
+                            self.is_offline_mode = False
+                            
+                            # 인증 데이터 저장 (기존 데이터와 다른 경우에만)
+                            if not saved_auth or saved_auth['user_id'] != self.user_id or saved_auth['user_pwd'] != self.user_pwd:
+                                logger.info('새로운 인증 정보 저장')
+                                self.auth_manager.save_auth_data(self.user_id, self.user_pwd, self.stores)
+                            
+                            return data
+                        else:
+                            raise Exception('토큰이 응답에 없습니다.')
+            except Exception as e:
+                logger.error(f'온라인 인증 실패: {e}')
+                # 온라인 인증 실패 시 저장된 인증 정보로 재시도
+                if saved_auth and saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
+                    logger.info('온라인 인증 실패로 인한 오프라인 모드 전환')
+                    self.stores = saved_auth['stores']
+                    self.is_offline_mode = True
+                    return {"token": "offline_mode", "stores": self.stores}
+                raise
+                
         except Exception as e:
-            logger.error(f'인증 에러 발생: {e}')
+            logger.error(f'인증 처리 중 오류 발생: {e}')
+            return False
+
+    async def select_store(self, store_id: int):
+        """매장 선택 및 소켓 연결 메서드"""
+        try:
+            # 선택된 매장 찾기
+            selected_store = next((store for store in self.stores if store['id'] == store_id), None)
+            if not selected_store:
+                raise Exception(f'매장 ID {store_id}를 찾을 수 없습니다.')
+            
+            # 매장 정보 설정
+            self.selected_store = selected_store
+            self.tenant_id = selected_store['tenant_id']
+            self.store_name = selected_store['name']
+            logger.info(f'매장 선택: {self.store_name}')
+            logger.info(f"오프라인 모드? {self.is_offline_mode}")
+            # 오프라인 모드가 아닌 경우에만 소켓 연결 시도
+            if not self.is_offline_mode:
+                # 기존 연결 초기화
+                await self.reset_state()
+                
+                # 새로운 소켓 연결 시도
+                success = await self.handle_websocket()
+                if not success:
+                    logger.warning('소켓 연결 실패, 오프라인 모드로 전환')
+                    self.is_offline_mode = True
+                    return True
+                
+                try:
+                    await asyncio.wait_for(self.auth_event.wait(), timeout=30.0)
+                    if not self.is_connected or not self.is_subscribed:
+                        logger.error('인증은 완료되었으나 연결 또는 구독 상태가 아닙니다')
+                        self.is_offline_mode = True
+                        return True
+                except asyncio.TimeoutError:
+                    logger.error('인증 타임아웃')
+                    self.is_offline_mode = True
+                    return True
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f'매장 선택 중 오류 발생: {e}')
             return False
 
     async def broadcast_authentication(self, socket_id):
@@ -158,9 +246,10 @@ class ReverbTestController:
                 }
                 
                 async with session.post(
-                    'http://192.168.200.115:8000/api/pusher/user-auth',
+                    f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/pusher/user-auth",
                     headers=headers,
-                    params=params
+                    params=params,
+                    ssl=ssl_context if self.is_ssl else None
                 ) as response:
                     logger.debug(f'인증 응답 상태 코드: {response.status}')
                     response_text = await response.text()
@@ -230,22 +319,41 @@ class ReverbTestController:
 
     async def handle_websocket(self):
         """WebSocket 연결 및 메시지 처리를 담당하는 메서드"""
-        try:
-            # 이전 상태 초기화
-            await self.reset_state()
-            
-            # 새로운 WebSocket 연결 시도
-            self.websocket = await websockets.connect(self.server_url)
-            logger.info('WebSocket 연결 성공')
-            
-            # 새로운 listening 태스크 시작
-            self._listening_task = asyncio.create_task(self.listen_for_messages())
-            
-            return True
-        except Exception as e:
-            logger.error(f'WebSocket 연결 중 에러 발생: {e}')
-            await self.reset_state()
-            return False
+        while self._reconnect_attempts < self.MAX_RECONNECT_ATTEMPTS:
+            try:
+                # 이전 상태 초기화
+                await self.reset_state()
+                
+                
+                # 새로운 WebSocket 연결 시도
+                self.websocket = await websockets.connect(
+                    self.server_url,
+                    ssl=ssl_context if self.is_ssl else None
+                )
+                logger.info('WebSocket 연결 성공')
+                
+                # 연결 성공 시 재시도 카운터 초기화
+                self._reconnect_attempts = 0
+                
+                # 새로운 listening 태스크 시작
+                self._listening_task = asyncio.create_task(self.listen_for_messages())
+                
+                return True
+                
+            except (websockets.exceptions.ConnectionClosed, ConnectionRefusedError) as e:
+                self._reconnect_attempts += 1
+                wait_time = min(2 ** self._reconnect_attempts, 60)  # 지수 백오프, 최대 60초
+                logger.error(f'WebSocket 연결 실패 ({self._reconnect_attempts}/{self.MAX_RECONNECT_ATTEMPTS}): {e}')
+                logger.info(f'{wait_time}초 후 재시도...')
+                await asyncio.sleep(wait_time)
+                
+            except Exception as e:
+                logger.error(f'예기치 않은 에러 발생: {e}')
+                await self.reset_state()
+                return False
+                
+        logger.error(f'최대 재시도 횟수({self.MAX_RECONNECT_ATTEMPTS})를 초과했습니다.')
+        return False
 
     async def listen_for_messages(self):
         """WebSocket 메시지 수신을 담당하는 메서드"""
@@ -302,7 +410,7 @@ class ReverbTestController:
                             await self.reset_state()
                             self.auth_event.set()
                             raise Exception(f'인증 실패: {error_data["message"]}')
-                    elif data['event'] == 'App\\Events\\PurchaseEvent':
+                    elif data['event'] == 'App\\Events\\ToAdminPanel\\PurchaseEvent':
                         logger.info('메시지 수신')
                         purchase_data = json.loads(data['data'])['purchaseLog']
                         purchase_model = PurchaseData(
@@ -317,10 +425,46 @@ class ReverbTestController:
                             price=purchase_data['price'],
                             used_points=purchase_data['used_points']
                         )
-                        db.add(purchase_model)
-                        db.commit()
-                        db.refresh(purchase_model)
-                        logger.info(f'구매 데이터 저장: {purchase_model.id}')
+                        
+                        # 데이터베이스 세션 가져오기
+                        db = get_db_direct()
+                        try:
+                            db.add(purchase_model)
+                            db.commit()
+                            db.refresh(purchase_model)
+                            logger.info(f'구매 데이터 저장: {purchase_model.id}')
+                        finally:
+                            db.close()
+                        
+                    elif data['event'] == 'App\\Events\\ToAdminPanel\\RegisterEvent':
+                        logger.info('가입 메시지 수신')
+                        customer_data = json.loads(data['data'])['customer']
+                        logger.info(f'가입 데이터: {customer_data}')
+                        
+                        # 데이터베이스 세션 가져오기
+                        db = get_db_direct()
+                        try:
+                            # 가입 데이터를 데이터베이스에 저장
+                            customer_model = models.UserData(
+                                name=customer_data['name'],
+                                phone_number=customer_data['phone_number'],
+                                regist_mail=customer_data['regist_mail'],
+                                uuid=customer_data['uuid'],
+                                game_join_count=customer_data['game_join_count'],
+                                visit_count=customer_data['visit_count'],
+                                register_at=datetime.strptime(customer_data['register_at'], '%Y-%m-%d %H:%M:%S'),
+                                last_visit_at=datetime.strptime(customer_data['last_visit_at'], '%Y-%m-%d %H:%M:%S'),
+                                point=customer_data['point'],
+                                total_point=customer_data['total_point'],
+                                remark=customer_data['remark'],
+                                awarding_history=customer_data['awarding_history'],
+                                point_history=customer_data['point_history']
+                            )
+                            db.add(customer_model)
+                            db.commit()
+                            db.refresh(customer_model)
+                        finally:
+                            db.close()
                         
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("WebSocket 연결이 닫혔습니다.")
@@ -357,7 +501,7 @@ class ReverbTestController:
     async def update_purchase_data_payment_success(self, purchase_data:models.PurchaseData):
         """구매 데이터 업데이트 메시지를 보내는 메서드"""
         logger.info(f'구매 데이터 업데이트 메시지 전송 시도: 구매 ID {purchase_data.id}')
-        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="PaymentSucess", message=purchase_data.uuid)
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="PaymentSuccess", message=purchase_data.uuid)
 
     async def update_purchase_data_chip_success(self, purchase_data:models.PurchaseData):
         """구매 데이터 업데이트 메시지를 보내는 메서드"""
@@ -445,38 +589,18 @@ class ReverbTestController:
 
     async def main(self, user_id, user_pwd):
         """메인 실행 메서드"""
-        logger.debug('WebSocket 연결 시도: ' + self.server_url)
+        logger.debug('로그인 시도')
         self.user_id = user_id
         self.user_pwd = user_pwd
-        self.auth_event.clear()  # 인증 이벤트 초기화
+        self.auth_event.clear()
         
-        # 이미 연결되어 있다면 연결을 재사용
-        if self.is_connected and self.websocket and self.is_subscribed:
-            logger.debug('이미 WebSocket이 연결되어 있습니다. 기존 연결을 유지합니다.')
-            return True
-        
-        # 인증 요청 먼저 수행
+        # 인증 요청 수행
         auth_result = await self.request_auth()
-        if not auth_result or auth_result is False:
-            logger.error('인증 실패. WebSocket 연결을 진행하지 않습니다.')
+        if not auth_result:
+            logger.error('인증 실패')
             return False
             
-        success = await self.handle_websocket()
-        if not success:
-            return False
-            
-        # 인증 완료될 때까지 대기
-        try:
-            await asyncio.wait_for(self.auth_event.wait(), timeout=30.0)  # 30초 타임아웃으로 증가
-            if not self.is_connected or not self.is_subscribed:
-                logger.error('인증은 완료되었으나 연결 또는 구독 상태가 아닙니다.')
-                return False
-            return True
-        except asyncio.TimeoutError:
-            logger.error('인증 타임아웃')
-            self.is_connected = False
-            self.is_subscribed = False
-            return False
+        return True
 
     async def logout(self):
         """로그아웃 처리를 수행하는 메서드"""
@@ -494,22 +618,21 @@ class ReverbTestController:
             if self.websocket:
                 await self.websocket.close()
                 
-            # 모든 상태 초기화
+            # 연결 관련 상태만 초기화
             self.is_connected = False
             self.is_subscribed = False
             self.is_handling_message = False
             self.websocket = None
             self.bearer_token = ""
-            self.user_id = ""
-            self.user_pwd = ""
-            self.tenant_id = ""
             self.socket_id = ""
-            self.store_name = ""
             self.message_queue = []
             self.auth_event.clear()
+            self.is_offline_mode = False
             
-            logger.info('로그아웃 처리 완료')
+            # 인증 데이터는 유지 (user_id, user_pwd, stores, tenant_id, store_name)
+            
+            logger.info('로그아웃 처리 완료 (인증 데이터 유지)')
             return True
         except Exception as e:
-            logger.error(f'로그아웃 처리 중 에러 발생: {e}')
+            logger.error(f'로그아웃 처리 중 오류 발생: {e}')
             return False

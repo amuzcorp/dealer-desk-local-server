@@ -21,7 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Controllers import device_controller, table_controller
 import models
 import schemas
-from database import get_db
+from database import get_db, get_db_direct
 
 router = APIRouter(
     prefix="/games",
@@ -53,27 +53,38 @@ async def get_first_last_game_start_date(db: Session = Depends(get_db)):
     )
 
 @router.get("/get-activate-games")
-async def get_activate_games(db: Session = Depends(get_db)):
-    async def get_active_list(db_inFun : Session):
-        games = db_inFun.query(models.GameData).filter(models.GameData.game_status.in_(["waiting", "in-progress"])).all()
-        game_list = []
-        for g in games:
-            game_list.append(g.to_json())
-        return game_list
-    
-    async def event_generator(db_inFun : Session):
-        while True:
-            try:
-                game_list = await get_active_list(db_inFun)
-                print(f"전송된 게임 개수 : {len(game_list)}")
-                yield f"{json.dumps(game_list)}\n\n"
-                await asyncio.sleep(3)
-            except Exception as e:
-                print(f"오류 발생: {str(e)}")
-                yield f"error: {str(e)}\n\n"
-                break;
-
-    return EventSourceResponse(event_generator(db), media_type="text/event-stream")
+async def get_activate_games():
+    """
+    활성화된 게임 목록을 조회합니다.
+    """
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        games = db.query(models.GameData).filter(
+            models.GameData.game_status.in_(["waiting", "in_progress"])
+        ).all()
+        
+        if not games:
+            return JSONResponse(
+                content={"response": 201, "message": "활성화된 게임이 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        json_data_games = []
+        for game in games:
+            json_data_games.append(jsonable_encoder(game.to_json()))
+            
+        return JSONResponse(
+            content={"response": 200, "data": json_data_games},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
 
 @router.get("/get-active-game-no-sse-data")
 async def get_active_game_no_sse_data(db: Session = Depends(get_db)):
