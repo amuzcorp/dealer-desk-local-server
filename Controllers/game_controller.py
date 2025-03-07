@@ -71,7 +71,7 @@ async def get_activate_games():
     db = get_db_direct()
     try:
         games = db.query(models.GameData).filter(
-            models.GameData.game_status.in_(["waiting", "in_progress"])
+            models.GameData.game_status.in_(["waiting", "in-progress"])
         ).all()
         
         if not games:
@@ -258,7 +258,7 @@ async def control_game_state(game_data: dict):
             )
             
         # 게임 조회
-        game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+        game : models.GameData = db.query(models.GameData).filter(models.GameData.id == game_id).first()
         if not game:
             return JSONResponse(
                 content={"response": 404, "message": "게임을 찾을 수 없습니다"},
@@ -266,17 +266,35 @@ async def control_game_state(game_data: dict):
             )
             
         # 게임 상태 업데이트
-        if game_status == "in_progress":
-            game.game_status = "in_progress"
-            game.game_start_time = datetime.now()
+        if game_status == "in-progress":
+            game.game_status = "in-progress"
+            if(game.game_stop_time):
+                game.game_calcul_time = game.game_calcul_time + (datetime.now() - game.game_stop_time)
+                game.game_stop_time = None
         elif game_status == "end":
             game.game_status = "end"
             game.game_end_time = datetime.now()
+        elif game_status == "stop":
+            game.game_stop_time = datetime.now()
         else:
             game.game_status = game_status
             
         db.commit()
         db.refresh(game)
+        
+        # 관련 디바이스에게 변경 알림
+        table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        for table_data in table_datas:
+            table_connect_device = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets = device_controller.device_socket_data;
+            for device_socket in devices_sockets:
+                if device_socket.device_uid in table_connect_device:
+                    print(f"device_socket.device_uid : {device_socket.device_uid}")
+                    await device_controller.send_connect_game_socket_event(device_socket.device_uid, game.id)
+        
+        # 중앙 서버에 보내기
+        import main
+        await main.socket_controller.update_game_data(game)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 상태가 업데이트되었습니다", "data": game.to_json()},
@@ -320,6 +338,9 @@ async def control_game_time(game_id: str, time_dict: dict):
             
         db.commit()
         db.refresh(game)
+        
+        import main
+        await main.socket_controller.update_game_data(game)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 시간이 업데이트되었습니다", "data": game.to_json()},
@@ -380,6 +401,9 @@ async def update_game_final_prize_by_id(game_id: int, game_data: dict):
         
         db.commit()
         db.refresh(game)
+        
+        import main
+        await main.socket_controller.update_game_data(game)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 최종 상금이 업데이트되었습니다", "data": game.to_json()},

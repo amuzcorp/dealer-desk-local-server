@@ -197,16 +197,12 @@ class UserData(Base):
     name = Column(String, index=True)
     uuid = Column(String, index=True)
     phone_number = Column(String, index=True, nullable=True)
-    regist_mail = Column(String, nullable=True)
+    email = Column(String, nullable=True)
     game_join_count = Column(Integer, default=0)
     visit_count = Column(Integer, default=0)
     register_at = Column(DateTime, default=datetime.now())
     last_visit_at = Column(DateTime, default=datetime.now())
-    point = Column(Integer, default=0)
-    total_point = Column(Integer, default=0)
     remark = Column(String, default="")
-    awarding_history = Column(JSON, default=[])
-    point_history = Column(JSON, default=[])
     
     def to_json(self):
         return {
@@ -214,16 +210,12 @@ class UserData(Base):
             "name": self.name,
             "uuid": self.uuid,
             "phone_number": self.phone_number,
-            "regist_mail": self.regist_mail,
+            "email": self.email,
             "game_join_count": self.game_join_count,
             "visit_count": self.visit_count,
             "register_at": self.register_at.isoformat() if self.register_at else None,
             "last_visit_at": self.last_visit_at.isoformat() if self.last_visit_at else None,
-            "point": self.point,
-            "total_point": self.total_point,
             "remark": self.remark,
-            "awarding_history": self.awarding_history,
-            "point_history": self.point_history
         }
 
 class AwardingHistoryData(Base):

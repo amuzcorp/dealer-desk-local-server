@@ -112,7 +112,7 @@ class ReverbTestController:
     is_offline_mode = False
     def __init__(self):
         self.bearer_token = ""
-        self.channel_name = "private-admin_penal_"
+        self.channel_name = "private-admin_penal."
         self.is_ssl = True
         self.base_url = "dealer-desk.dev.amuz.kr"
         self.server_url = f"{'wss' if self.is_ssl else 'ws'}://{self.base_url}/app/hyx4ylczjr3sndkwqx8u"
@@ -127,89 +127,110 @@ class ReverbTestController:
             logger.debug(f'로그인 시도 - User ID: {self.user_id}, User PWD: {self.user_pwd}')
             
             # 저장된 인증 데이터 확인
+            central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(central_health_check_url, ssl=ssl_context if self.is_ssl else None) as response:
+                        if response.status == 200:
+                            logger.info('중앙 서버 정상 작동')
+                            self.is_offline_mode = False
+                            return await self.handle_online_login(saved_auth)
+                        else:
+                            logger.info('중앙 서버 응답 비정상, 오프라인 모드로 전환합니다')
+                            return await self.handle_offline_login(saved_auth)
+            except Exception as e:
+                logger.error(f'중앙 서버 연결 실패, 오프라인 모드로 전환합니다: {e}')
+            
             saved_auth = self.auth_manager.load_auth_data()
             if saved_auth:
                 if saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
                     logger.info('저장된 인증 정보로 오프라인 로그인 시도')
-                    self.stores = saved_auth['stores']
-                    # 중앙 서버 상태 확인
-                    central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
-                    try:
-                        async with aiohttp.ClientSession() as session:
-                            async with session.get(central_health_check_url, ssl=ssl_context if self.is_ssl else None) as response:
-                                if response.status == 200:
-                                    # 서버가 정상이면 온라인 모드 시도
-                                    self.is_offline_mode = False
-                                    load_token_path = os.path.join(os.path.expanduser('~'), '.dealer_desk', 'token.txt')
-                                    with open(load_token_path, 'r') as token_file:
-                                        self.bearer_token = token_file.read()
-                                    logger.info('중앙 서버 연결 가능, 온라인 모드로 시도합니다')
-                                else:
-                                    # 서버 응답이 200이 아니면 오프라인 모드
-                                    self.is_offline_mode = True
-                                    logger.info('중앙 서버 응답 비정상, 오프라인 모드로 전환합니다')
-                    except Exception as e:
-                        # 연결 실패 시 오프라인 모드
-                        self.is_offline_mode = True
-                        logger.error(f'중앙 서버 연결 실패, 오프라인 모드로 전환합니다: {e}')
-                    
-                    return {"token": "offline_mode", "stores": self.stores}
-            
+                    return await self.handle_offline_login(saved_auth)
+
             # 온라인 인증 시도
-            try:
-                async with aiohttp.ClientSession() as session:
-                    auth_data = { 
-                        "email": self.user_id,
-                        "password": self.user_pwd
-                    }
-                    headers = {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    }
-                    logger.debug('온라인 로그인 시도')
-                    async with session.post(
-                        f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/login",
-                        json=auth_data,
-                        headers=headers,
-                        ssl=ssl_context if self.is_ssl else None
-                    ) as response:
-                        data = await response.json()
-                        print(data)
-                        if data:
-                            # 성공적인 온라인 인증 시 데이터 저장
-                            self.bearer_token = data['token']
-                            # 토큰을 파일로 저장
-                            token_file_path = os.path.join(os.path.expanduser('~'), '.dealer_desk', 'token.txt')
-                            with open(token_file_path, 'w') as token_file:
-                                token_file.write(data['token'])
-                            logger.info(f'토큰을 파일에 저장했습니다: {token_file_path}')
-                            logger.info(f'bearer_token: {self.bearer_token}')
-                            if self.bearer_token == None:
-                                raise Exception("토큰이 없습니다.")
-                            self.stores = data['stores']
-                            self.is_offline_mode = False
-                            
-                            # 인증 데이터 저장 (기존 데이터와 다른 경우에만)
-                            if not saved_auth or saved_auth['user_id'] != self.user_id or saved_auth['user_pwd'] != self.user_pwd:
-                                logger.info('새로운 인증 정보 저장')
-                                self.auth_manager.save_auth_data(self.user_id, self.user_pwd, self.stores)
-                            
-                            return data
-                        else:
-                            raise Exception('토큰이 응답에 없습니다.')
-            except Exception as e:
-                logger.error(f'온라인 인증 실패: {e}')
-                # 온라인 인증 실패 시 저장된 인증 정보로 재시도
-                if saved_auth and saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
-                    logger.info('온라인 인증 실패로 인한 오프라인 모드 전환')
-                    self.stores = saved_auth['stores']
-                    self.is_offline_mode = True
-                    return {"token": "offline_mode", "stores": self.stores}
-                raise
-                
+            return await self.handle_online_login(saved_auth)
+            
         except Exception as e:
             logger.error(f'인증 처리 중 오류 발생: {e}')
             return False
+
+    async def handle_offline_login(self, saved_auth):
+        """오프라인 로그인 처리 메서드"""
+        self.stores = saved_auth['stores']
+        # 중앙 서버 상태 확인
+        central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(central_health_check_url, ssl=ssl_context if self.is_ssl else None) as response:
+                    if response.status == 200:
+                        # 서버가 정상이면 온라인 모드 시도
+                        self.is_offline_mode = False
+                        load_token_path = os.path.join(os.path.expanduser('~'), '.dealer_desk', 'token.txt')
+                        with open(load_token_path, 'r') as token_file:
+                            self.bearer_token = token_file.read()
+                        logger.info('중앙 서버 연결 가능, 온라인 모드로 시도합니다')
+                    else:
+                        # 서버 응답이 200이 아니면 오프라인 모드
+                        self.is_offline_mode = True
+                        logger.info('중앙 서버 응답 비정상, 오프라인 모드로 전환합니다')
+        except Exception as e:
+            # 연결 실패 시 오프라인 모드
+            self.is_offline_mode = True
+            logger.error(f'중앙 서버 연결 실패, 오프라인 모드로 전환합니다: {e}')
+        
+        return {"token": "offline_mode", "stores": self.stores}
+
+    async def handle_online_login(self, saved_auth):
+        """온라인 로그인 처리 메서드"""
+        try:
+            async with aiohttp.ClientSession() as session:
+                auth_data = { 
+                    "email": self.user_id,
+                    "password": self.user_pwd
+                }
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+                logger.debug('온라인 로그인 시도')
+                async with session.post(
+                    f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/login",
+                    json=auth_data,
+                    headers=headers,
+                    ssl=ssl_context if self.is_ssl else None
+                ) as response:
+                    data = await response.json()
+                    if data:
+                        # 성공적인 온라인 인증 시 데이터 저장
+                        self.bearer_token = data['token']
+                        # 토큰을 파일로 저장
+                        token_file_path = os.path.join(os.path.expanduser('~'), '.dealer_desk', 'token.txt')
+                        with open(token_file_path, 'w') as token_file:
+                            token_file.write(data['token'])
+                        logger.info(f'토큰을 파일에 저장했습니다: {token_file_path}')
+                        logger.info(f'bearer_token: {self.bearer_token}')
+                        if self.bearer_token is None:
+                            raise Exception("토큰이 없습니다.")
+                        self.stores = data['stores']
+                        self.is_offline_mode = False
+                        
+                        # 인증 데이터 저장 (기존 데이터와 다른 경우에만)
+                        if not saved_auth or saved_auth['user_id'] != self.user_id or saved_auth['user_pwd'] != self.user_pwd:
+                            logger.info('새로운 인증 정보 저장')
+                            self.auth_manager.save_auth_data(self.user_id, self.user_pwd, self.stores)
+                        
+                        return data
+                    else:
+                        raise Exception('토큰이 응답에 없습니다.')
+        except Exception as e:
+            logger.error(f'온라인 인증 실패: {e}')
+            # 온라인 인증 실패 시 저장된 인증 정보로 재시도
+            if saved_auth and saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
+                logger.info('온라인 인증 실패로 인한 오프라인 모드 전환')
+                self.stores = saved_auth['stores']
+                self.is_offline_mode = True
+                return {"token": "offline_mode", "stores": self.stores}
+            raise
 
     async def select_store(self, store_id: int):
         """매장 선택 및 소켓 연결 메서드"""
@@ -474,18 +495,15 @@ class ReverbTestController:
                             customer_model = models.UserData(
                                 name=customer_data['name'],
                                 phone_number=customer_data['phone_number'],
-                                regist_mail=customer_data['regist_mail'],
+                                email=customer_data['email'],
                                 uuid=customer_data['uuid'],
                                 game_join_count=customer_data['game_join_count'],
                                 visit_count=customer_data['visit_count'],
                                 register_at=datetime.strptime(customer_data['register_at'], '%Y-%m-%d %H:%M:%S'),
                                 last_visit_at=datetime.strptime(customer_data['last_visit_at'], '%Y-%m-%d %H:%M:%S'),
-                                point=customer_data['point'],
-                                total_point=customer_data['total_point'],
                                 remark=customer_data['remark'],
-                                awarding_history=customer_data['awarding_history'],
-                                point_history=customer_data['point_history']
                             )
+                            print(f"customer_model : {customer_model.id}")
                             db.add(customer_model)
                             db.commit()
                             db.refresh(customer_model)
@@ -534,6 +552,12 @@ class ReverbTestController:
         logger.info(f'구매 데이터 업데이트 메시지 전송 시도: 구매 ID {purchase_data.id}')
         await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="ChipSuccess", message=purchase_data.uuid)
 
+    async def register_customer_data(self, user_data:models.UserData):
+        """사용자 데이터 생성 메시지를 보내는 메서드"""
+        logger.info(f'사용자 데이터 생성 메시지 전송 시도: 사용자 ID {user_data.id}')
+        user_data_json = user_data.to_json()
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="RegisterCustomer", message=user_data_json)
+    
     async def send_message(self, event_name, channel_name, data_type, message):
         """메시지를 WebSocket을 통해 전송하는 메서드"""
         subscription_message = {

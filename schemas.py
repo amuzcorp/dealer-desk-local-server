@@ -109,7 +109,7 @@ class UserDataBase(BaseModel):
     id: Optional[int] = None
     name: str
     phone_number: Optional[str] = None
-    regist_mail: Optional[str] = None
+    email: Optional[str] = None
     game_join_count: int
     visit_count: int
     register_at: datetime

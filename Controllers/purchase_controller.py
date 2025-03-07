@@ -77,8 +77,12 @@ async def waiting_to_payment_chip(purchase_id: int):
             
         # 상태 업데이트
         purchase.payment_status = "COMPLETED"
+        purchase.status = "CHIP_WAITING"
         db.commit()
         db.refresh(purchase)
+        
+        import main
+        await main.socket_controller.update_purchase_data_payment_success(purchase)
         
         return JSONResponse(
             content={"response": 200, "message": "결제 상태가 업데이트되었습니다", "data": purchase.to_json()},

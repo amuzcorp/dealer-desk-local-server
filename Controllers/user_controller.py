@@ -149,13 +149,11 @@ async def create_user(user_data: schemas.UserDataCreate):
         user = models.UserData(
             name=user_data.name,
             phone_number=user_data.phone_number,
-            regist_mail=user_data.regist_mail,
+            email=user_data.email,
             game_join_count=user_data.game_join_count,
             visit_count=user_data.visit_count,
             register_at=user_data.register_at,
             last_visit_at=user_data.last_visit_at,
-            point=user_data.point,
-            total_point=user_data.total_point,
             remark=user_data.remark,
         )
         
@@ -190,7 +188,7 @@ async def update_user(user_id: int, user_data: schemas.UserDataUpdate):
     try:
         user = db.query(models.UserData).filter(models.UserData.id == user_id).first()
         
-        if not user:
+        if not user: 
             return JSONResponse(
                 content={"response": 404, "message": "사용자를 찾을 수 없습니다"},
                 headers={"Content-Type": "application/json; charset=utf-8"}
@@ -199,7 +197,7 @@ async def update_user(user_id: int, user_data: schemas.UserDataUpdate):
         # 사용자 정보 업데이트
         user.name = user_data.name
         user.phone_number = user_data.phone_number
-        user.regist_mail = user_data.regist_mail
+        user.email = user_data.email
         user.game_join_count = user_data.game_join_count
         user.visit_count = user_data.visit_count
         user.register_at = user_data.register_at
@@ -275,25 +273,24 @@ async def create_guest_user(game_id: str):
             )
             
         # 게스트 사용자 생성
-        guest_name = "guest"+str(random.randint(10000, 99999))
+        guest_name = "guest" + str(random.randint(10000, 99999))
+        # ID를 1001부터 생성하도록 설정
         guest_user = models.UserData(
+            id=1000 + (db.query(models.UserData).count()),  # 현재 사용자 수에 1001을 더하여 ID 설정
             name=guest_name,
             uuid=str(uuid.uuid4()),  # UUID 생성
             game_join_count=1,  # 게임 참가 횟수 1로 설정
             visit_count=1,
             register_at=datetime.now(),
             last_visit_at=datetime.now(),
-            point=0,
-            total_point=0,
             remark="",
-            awarding_history=[],
-            point_history=[]
         )
+        
+        print(f"guest_user: {guest_user.id}")
         
         db.add(guest_user)
         db.commit()
         db.refresh(guest_user)
-        
         # 게임 참가자에 게스트 추가
         game_in_player = game.game_in_player.copy() if game.game_in_player else []
         
@@ -320,6 +317,8 @@ async def create_guest_user(game_id: str):
         # 응답 데이터 준비
         user_json = guest_user.to_json()
         
+        import main
+        await main.socket_controller.register_customer_data(guest_user)
         # 시간 포맷 변환
         # user_json["register_at"] = user_json["register_at"].isoformat() if user_json["register_at"] else None
         # user_json["last_visit_at"] = user_json["last_visit_at"].isoformat() if user_json["last_visit_at"] else None
@@ -485,6 +484,9 @@ async def update_user_in_game_sit_status(game_id: int, user_id: int, is_sit: boo
         
         db.commit()
         
+        import main
+        await main.socket_controller.update_game_data(game)
+        
         return JSONResponse(
             content={"response": 200, "message": "착석 상태가 업데이트되었습니다"},
             headers={"Content-Type": "application/json; charset=utf-8"}
@@ -534,6 +536,9 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase
         
         db.commit()
         db.refresh(game)
+        
+        import main
+        await main.socket_controller.update_game_data(game)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 참여 횟수가 업데이트되었습니다"},
@@ -634,7 +639,6 @@ async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, 
     db.refresh(game)
     
     import main
-    
     await main.socket_controller.update_game_data(game)
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송

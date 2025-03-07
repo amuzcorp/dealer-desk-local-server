@@ -16,7 +16,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import models
 import schemas
 from database import get_db, get_db_direct
-
 @dataclass
 class DeviceNameChangeData:
     device_uid: str
@@ -51,6 +50,7 @@ async def send_socket_message(websocket: WebSocket, response_code: int, data: an
     """
     WebSocket 메시지 전송을 위한 헬퍼 함수
     """
+    print(f"send_socket_message : {data}")
     await websocket.send_text(
         json.dumps({
             "response": response_code,
@@ -123,12 +123,15 @@ async def websocket_endpoint(websocket: WebSocket):
             await asyncio.sleep(1)
         
         await send_socket_message(websocket, 200, {"event": "connected"})
-        device_socket_data.append(DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket))
+        device_socket = DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket)
+        device_socket_data.append(device_socket)
         # 2초간 대기
         await asyncio.sleep(2)
         await connect_table_device_socket_event(device_data.device_uid)
         if(auth_device):
             await update_auth_device_status(auth_device.device_uid, True, db)
+
+        print("device_socket_data : ", device_socket_data)
         
         # 메시지 수신 대기
         while True:
@@ -275,6 +278,7 @@ async def send_connect_game_socket_event(device_uid: str, table_id: str):
             for device in device_socket_data:
                 if device.device_uid == device_uid:
                     try:
+                        print("device socket : ", device.device_socket)
                         await send_socket_message(
                             device.device_socket,
                             200,
