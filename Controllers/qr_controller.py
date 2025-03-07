@@ -26,5 +26,5 @@ async def create_qr_code(qr_code: schemas.QrCode):
     import main
     """QR 코드 생성"""
     
-    tenant_host = main.socket_controller.
+    tenant_host = main.socket_controller
     return JSONResponse(content={"message": "QR 코드 생성 완료"})

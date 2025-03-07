@@ -462,7 +462,7 @@ class ReverbTestController:
                         logger.info('메시지 수신')
                         purchase_data = json.loads(data['data'])['purchaseLog']
                         purchase_model = PurchaseData(
-                            
+                            payment_type=purchase_data['payment_type'],
                             purchase_type=purchase_data['purchase_type'],
                             game_id=purchase_data['game_id'],
                             customer_id=purchase_data['customer_id'], 
