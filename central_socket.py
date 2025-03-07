@@ -108,7 +108,8 @@ class ReverbTestController:
     _listening_task = None
     _reconnect_attempts = 0
     MAX_RECONNECT_ATTEMPTS = 5
-    
+    bearer_token = ""
+    is_offline_mode = False
     def __init__(self):
         self.bearer_token = ""
         self.channel_name = "private-admin_penal_"
@@ -131,7 +132,27 @@ class ReverbTestController:
                 if saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
                     logger.info('저장된 인증 정보로 오프라인 로그인 시도')
                     self.stores = saved_auth['stores']
-                    self.is_offline_mode = True
+                    # 중앙 서버 상태 확인
+                    central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
+                    try:
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(central_health_check_url, ssl=ssl_context if self.is_ssl else None) as response:
+                                if response.status == 200:
+                                    # 서버가 정상이면 온라인 모드 시도
+                                    self.is_offline_mode = False
+                                    load_token_path = os.path.join(os.path.expanduser('~'), '.dealer_desk', 'token.txt')
+                                    with open(load_token_path, 'r') as token_file:
+                                        self.bearer_token = token_file.read()
+                                    logger.info('중앙 서버 연결 가능, 온라인 모드로 시도합니다')
+                                else:
+                                    # 서버 응답이 200이 아니면 오프라인 모드
+                                    self.is_offline_mode = True
+                                    logger.info('중앙 서버 응답 비정상, 오프라인 모드로 전환합니다')
+                    except Exception as e:
+                        # 연결 실패 시 오프라인 모드
+                        self.is_offline_mode = True
+                        logger.error(f'중앙 서버 연결 실패, 오프라인 모드로 전환합니다: {e}')
+                    
                     return {"token": "offline_mode", "stores": self.stores}
             
             # 온라인 인증 시도
@@ -157,6 +178,11 @@ class ReverbTestController:
                         if data:
                             # 성공적인 온라인 인증 시 데이터 저장
                             self.bearer_token = data['token']
+                            # 토큰을 파일로 저장
+                            token_file_path = os.path.join(os.path.expanduser('~'), '.dealer_desk', 'token.txt')
+                            with open(token_file_path, 'w') as token_file:
+                                token_file.write(data['token'])
+                            logger.info(f'토큰을 파일에 저장했습니다: {token_file_path}')
                             logger.info(f'bearer_token: {self.bearer_token}')
                             if self.bearer_token == None:
                                 raise Exception("토큰이 없습니다.")
@@ -359,7 +385,7 @@ class ReverbTestController:
         """WebSocket 메시지 수신을 담당하는 메서드"""
         try:
             while True:
-                if not self.user_id or not self.bearer_token:  # 로그아웃 상태 체크
+                if not self.user_id and not self.bearer_token:  # 로그아웃 상태 체크
                     logger.info("로그아웃 상태입니다. 메시지 수신을 중단합니다.")
                     await self.reset_state()
                     break
@@ -572,20 +598,6 @@ class ReverbTestController:
     async def subscribe_send_message(self, event_name, channel_name, data_type, message):
         """이전 버전의 메시지 전송 메서드 (하위 호환성을 위해 유지)"""
         await self.send_message(event_name, channel_name, data_type, message)
-
-    async def login_with_token(self, token):
-        """토큰을 사용한 로그인 메서드"""
-        logger.debug('토큰으로 로그인 시도')
-        self.bearer_token = token
-        
-        # 이미 연결되어 있다면 연결을 재사용
-        if self.is_connected and self.websocket:
-            logger.debug('이미 WebSocket이 연결되어 있습니다. 기존 연결을 유지합니다.')
-            return True
-            
-        # 새로운 WebSocket 연결 시도
-        success = await self.handle_websocket()
-        return success
 
     async def main(self, user_id, user_pwd):
         """메인 실행 메서드"""

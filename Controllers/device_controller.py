@@ -43,6 +43,10 @@ router = APIRouter(
 
 MAX_DEVICE_NAME_LENGTH = 20
 
+#################################################
+# WebSocket 관련 함수 및 엔드포인트
+#################################################
+
 async def send_socket_message(websocket: WebSocket, response_code: int, data: any):
     """
     WebSocket 메시지 전송을 위한 헬퍼 함수
@@ -115,10 +119,10 @@ async def websocket_endpoint(websocket: WebSocket):
             if auth_device:
                 break
                 
-            await send_socket_message(websocket, 201, "Wait Auth Device")
+            await send_socket_message(websocket, 201, {"event" : "Wait Auth Device"})
             await asyncio.sleep(1)
         
-        await send_socket_message(websocket, 200, "connected")
+        await send_socket_message(websocket, 200, {"event": "connected"})
         device_socket_data.append(DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket))
         # 2초간 대기
         await asyncio.sleep(2)
@@ -151,6 +155,145 @@ async def websocket_endpoint(websocket: WebSocket):
             await update_auth_device_status(auth_device.device_uid, False, db)
     finally:
         db.close()
+
+async def connect_table_device_socket_event(device_uid: str):
+    """
+    디바이스를 테이블에 연결하는 이벤트 처리
+    """
+    try:
+        # 직접 세션 가져오기
+        db = get_db_direct()
+        try:
+            # 인증된 디바이스 찾기
+            auth_device = db.query(models.AuthDeviceData).filter(
+                models.AuthDeviceData.device_uid == device_uid
+            ).first()
+            
+            if not auth_device or not auth_device.connect_table_id:
+                return
+                
+            # 테이블 찾기
+            table = db.query(models.TableData).filter(
+                models.TableData.id == auth_device.connect_table_id
+            ).first()
+            
+            if not table:
+                return
+                
+            # 디바이스 소켓 찾기
+            device_socket = next(
+                (socket for socket in device_socket_data if socket.device_uid == device_uid),
+                None
+            )
+            
+            if device_socket:
+                device_socket.table_title = table.table_title
+                await send_socket_message(
+                    device_socket.device_socket,
+                    200,
+                    {
+                        "event": "connect_table",
+                        "table_title": table.table_title
+                    }
+                )
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Error in connect_table_device_socket_event: {e}")
+
+async def disconnect_table_device_socket_event(device_uid: str):
+    """
+    디바이스를 테이블에서 연결 해제하는 이벤트 처리
+    """
+    try:
+        # 디바이스 소켓 찾기
+        device_socket = next(
+            (socket for socket in device_socket_data if socket.device_uid == device_uid),
+            None
+        )
+        
+        if device_socket:
+            device_socket.table_title = None
+            await send_socket_message(
+                device_socket.device_socket,
+                200,
+                {
+                    "event": "disconnect_table"
+                }
+            )
+    except Exception as e:
+        print(f"Error in disconnect_table_device_socket_event: {e}")
+
+async def send_delete_device_socket_event(device_uid: str):
+    """디바이스 삭제 시 소켓 연결 해제"""
+    for device in device_socket_data:
+        if device.device_uid == device_uid:
+            await device.device_socket.close()
+            del device_socket_data[device_socket_data.index(device)]
+            break
+
+async def send_connect_game_socket_event(device_uid: str, table_id: str):
+    """
+    디바이스에 게임 연결 이벤트를 전송합니다.
+    """
+    try:
+        # 직접 세션 가져오기
+        db = get_db_direct()
+        try:
+            # 테이블 데이터 조회
+            table_data = db.query(models.TableData).filter(models.TableData.id == table_id).first()
+            
+            if not table_data:
+                print(f"테이블을 찾을 수 없음: {table_id}")
+                return
+                
+            game_id = table_data.game_id
+            
+            # 게임 데이터가 없는 경우 연결 해제 메시지 전송
+            if not game_id:
+                # 디바이스 소켓 찾기
+                for device in device_socket_data:
+                    if device.device_uid == device_uid:
+                        await send_socket_message(
+                            device.device_socket,
+                            200,
+                            {
+                                "event": "game_disconnect"
+                            }
+                        )
+                        break
+                return
+                
+            # 게임 데이터 조회
+            game_data = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+            
+            if not game_data:
+                print(f"게임을 찾을 수 없음: {game_id}")
+                return
+                
+            # 디바이스 소켓 찾기
+            for device in device_socket_data:
+                if device.device_uid == device_uid:
+                    try:
+                        await send_socket_message(
+                            device.device_socket,
+                            200,
+                            {
+                                "event": "game_connect",
+                                "game_data": game_data.to_json()
+                            }
+                        )
+                    except Exception as e:
+                        print(f"디바이스 {device_uid}에 메시지 전송 중 오류: {e}")
+                    break
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"게임 연결 이벤트 처리 중 오류: {e}")
+
+#################################################
+# REST API 엔드포인트
+#################################################
 
 @router.get("/get-waiting-device")
 async def get_waiting_device():
@@ -418,138 +561,3 @@ async def delete_auth_device(device_id: int):
         )
     finally:
         db.close()
-
-async def connect_table_device_socket_event(device_uid: str):
-    """
-    디바이스를 테이블에 연결하는 이벤트 처리
-    """
-    try:
-        # 직접 세션 가져오기
-        db = get_db_direct()
-        try:
-            # 인증된 디바이스 찾기
-            auth_device = db.query(models.AuthDeviceData).filter(
-                models.AuthDeviceData.device_uid == device_uid
-            ).first()
-            
-            if not auth_device or not auth_device.connect_table_id:
-                return
-                
-            # 테이블 찾기
-            table = db.query(models.TableData).filter(
-                models.TableData.id == auth_device.connect_table_id
-            ).first()
-            
-            if not table:
-                return
-                
-            # 디바이스 소켓 찾기
-            device_socket = next(
-                (socket for socket in device_socket_data if socket.device_uid == device_uid),
-                None
-            )
-            
-            if device_socket:
-                device_socket.table_title = table.table_title
-                await send_socket_message(
-                    device_socket.device_socket,
-                    200,
-                    {
-                        "event": "connect_table",
-                        "table_title": table.table_title
-                    }
-                )
-        finally:
-            db.close()
-    except Exception as e:
-        print(f"Error in connect_table_device_socket_event: {e}")
-
-async def disconnect_table_device_socket_event(device_uid: str):
-    """
-    디바이스를 테이블에서 연결 해제하는 이벤트 처리
-    """
-    try:
-        # 디바이스 소켓 찾기
-        device_socket = next(
-            (socket for socket in device_socket_data if socket.device_uid == device_uid),
-            None
-        )
-        
-        if device_socket:
-            device_socket.table_title = None
-            await send_socket_message(
-                device_socket.device_socket,
-                200,
-                {
-                    "event": "disconnect_table"
-                }
-            )
-    except Exception as e:
-        print(f"Error in disconnect_table_device_socket_event: {e}")
-
-async def send_delete_device_socket_event(device_uid: str):
-    """디바이스 삭제 시 소켓 연결 해제"""
-    for device in device_socket_data:
-        if device.device_uid == device_uid:
-            await device.device_socket.close()
-            del device_socket_data[device_socket_data.index(device)]
-            break
-
-async def send_connect_game_socket_event(device_uid: str, table_id: str):
-    """
-    디바이스에 게임 연결 이벤트를 전송합니다.
-    """
-    try:
-        # 직접 세션 가져오기
-        db = get_db_direct()
-        try:
-            # 테이블 데이터 조회
-            table_data = db.query(models.TableData).filter(models.TableData.id == table_id).first()
-            
-            if not table_data:
-                print(f"테이블을 찾을 수 없음: {table_id}")
-                return
-                
-            game_id = table_data.game_id
-            
-            # 게임 데이터가 없는 경우 연결 해제 메시지 전송
-            if not game_id:
-                # 디바이스 소켓 찾기
-                for device in device_socket_data:
-                    if device.device_uid == device_uid:
-                        await send_socket_message(
-                            device.device_socket,
-                            200,
-                            {
-                                "event": "game_disconnect"
-                            }
-                        )
-                        break
-                return
-                
-            # 게임 데이터 조회
-            game_data = db.query(models.GameData).filter(models.GameData.id == game_id).first()
-            
-            if not game_data:
-                print(f"게임을 찾을 수 없음: {game_id}")
-                return
-                
-            # 디바이스 소켓 찾기
-            for device in device_socket_data:
-                if device.device_uid == device_uid:
-                    try:
-                        await send_socket_message(
-                            device.device_socket,
-                            200,
-                            {
-                                "event": "game_connect",
-                                "game_data": game_data.to_json()
-                            }
-                        )
-                    except Exception as e:
-                        print(f"디바이스 {device_uid}에 메시지 전송 중 오류: {e}")
-                    break
-        finally:
-            db.close()
-    except Exception as e:
-        print(f"게임 연결 이벤트 처리 중 오류: {e}")

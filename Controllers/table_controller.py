@@ -243,7 +243,7 @@ async def connect_table_game_id(table_game_id: dict):
             
         print(f"찾은 테이블: {table.to_json()}")
         
-        # 테이블에 게임 ID 설정
+        # 테이블에 게임 ID 설
         table.game_id = game_id
         
         # 게임 조회

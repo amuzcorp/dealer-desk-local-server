@@ -116,10 +116,9 @@ class GameData(Base):
     game_stop_time = Column(DateTime, nullable=True, default=datetime.now())
     game_end_time = Column(DateTime, default=None, nullable=True)
     game_status = Column(String, index=True, default="waiting")  # waiting, in_progress, end
-    addon_count = Column(Integer, default=0)
-    addon_price = Column(Integer, default=0)
     game_in_player = Column(JSON, default=list)
     table_connect_log = Column(JSON, default=list)
+    addon_count = Column(Integer, default=0)
 
     # 게임 데이터는 프리셋 전체 데이터를 가짐     
     time_table_data = Column(JSON)
@@ -145,17 +144,17 @@ class GameData(Base):
             "game_stop_time" : self.game_stop_time.isoformat() if self.game_stop_time else None,
             "game_end_time" : self.game_end_time.isoformat() if self.game_end_time else None,
             "game_status" : self.game_status,
-            "addon_count" : self.addon_count, 
-            "addon_price" : self.addon_price,
+            "addon_count" : self.addon_count,
             "game_in_player" : self.game_in_player,
             "table_connect_log" : self.table_connect_log,
             "time_table_data" : self.time_table_data,
             "buy_in_price" : self.buy_in_price,
-            "re_buy_in_price" : self.re_buy_in_price,
+            "re_buy_in_price" : self.re_buy_in_price, 
             "starting_chips" : self.starting_chip,
             "rebuyin_payment_chips" : self.rebuyin_payment_chips,
             "rebuyin_number_limits" : self.rebuyin_number_limits,
             "addon_data" : self.addon_data,
+            "addon_price" : 0,
             "prize_settings" : self.prize_settings,
             "rebuy_cut_off" : self.rebuy_cut_off,
             "final_prize" : self.final_prize

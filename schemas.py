@@ -117,8 +117,6 @@ class UserDataBase(BaseModel):
     point: int
     total_point: int
     remark: str
-    awarding_history: List[Dict[str, Any]]
-    point_history: List[Dict[str, Any]]
     
 class UserDataCreate(UserDataBase):
     pass

@@ -21,7 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Controllers import device_controller, table_controller
 import models
 import schemas
-from database import get_db
+from database import get_db, get_db_direct
 
 router = APIRouter(
     prefix="/awarding",
@@ -30,7 +30,8 @@ router = APIRouter(
 
 
 @router.post("/create-awarding-history")
-async def create_awarding_history(awarding_history: schemas.AwardingHistoryCreate, db: Session = Depends(get_db)):
+async def create_awarding_history(awarding_history: schemas.AwardingHistoryCreate):
+    db = get_db_direct()
     db_awarding_history = models.AwardingHistoryData(
         game_id=awarding_history.game_id,
         customer_id=awarding_history.customer_id,
@@ -47,7 +48,8 @@ async def create_awarding_history(awarding_history: schemas.AwardingHistoryCreat
     )
     
 @router.get("/get-awarding-history-by-user-id/{user_id}")
-async def get_awarding_history_by_user_id(user_id: int, db: Session = Depends(get_db)):
+async def get_awarding_history_by_user_id(user_id: int):
+    db = get_db_direct()
     db_awarding_history = db.query(models.AwardingHistoryData).filter(models.AwardingHistoryData.customer_id == user_id).all()
     response_data = []
     for awarding_history in db_awarding_history:
@@ -58,7 +60,8 @@ async def get_awarding_history_by_user_id(user_id: int, db: Session = Depends(ge
     )
 
 @router.get("/get-awarding-history-by-game-id/{game_id}")
-async def get_awarding_history_by_game_id(game_id: int, db: Session = Depends(get_db)):
+async def get_awarding_history_by_game_id(game_id: int):
+    db = get_db_direct()
     db_awarding_history = db.query(models.AwardingHistoryData).filter(models.AwardingHistoryData.game_id == game_id).all()
     response_data = []
     for awarding_history in db_awarding_history:
