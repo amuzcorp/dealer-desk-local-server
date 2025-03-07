@@ -596,7 +596,7 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
     for table in tables:
         devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
         for device in devices:
-            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)   
+            await device_controller.send_connect_game_socket_event(device.device_uid, table.id)   
 
     return JSONResponse(
         content={"response": 200, "message": "게임 플레이어 리버이 인 상태가 업데이트되었습니다"},
@@ -646,7 +646,7 @@ async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, 
     for table in tables:
         devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
         for device in devices:
-            await device_controller.send_connect_game_socket_event(device.device_uid, table.id, db)   
+            await device_controller.send_connect_game_socket_event(device.device_uid, table.id)
 
     return JSONResponse(
         content={"response": 200, "message": "게임 플레이어 애드온 상태가 업데이트되었습니다"},

@@ -285,12 +285,13 @@ async def control_game_state(game_data: dict):
         # 관련 디바이스에게 변경 알림
         table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
-            table_connect_device = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
             devices_sockets = device_controller.device_socket_data;
-            for device_socket in devices_sockets:
-                if device_socket.device_uid in table_connect_device:
-                    print(f"device_socket.device_uid : {device_socket.device_uid}")
-                    await device_controller.send_connect_game_socket_event(device_socket.device_uid, game.id)
+            for table_connect_device in table_connect_devices:
+                for device_socket in devices_sockets:
+                    if device_socket.device_uid == table_connect_device.device_uid:
+                        print(f"device_socket.device_uid : {device_socket.device_uid}")
+                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, game.id)
         
         # 중앙 서버에 보내기
         import main

@@ -76,8 +76,8 @@ async def waiting_to_payment_chip(purchase_id: int):
             )
             
         # 상태 업데이트
-        purchase.payment_status = "COMPLETED"
-        purchase.status = "CHIP_WAITING"
+        purchase.payment_status = "SUCCESS"
+        purchase.status = "SUCCESS"
         db.commit()
         db.refresh(purchase)
         
@@ -113,7 +113,7 @@ async def chip_waiting_to_success(purchase_id: int):
             )
             
         # 상태 업데이트
-        purchase.status = "COMPLETED"
+        purchase.status = "SUCCESS"
         db.commit()
         db.refresh(purchase)
         

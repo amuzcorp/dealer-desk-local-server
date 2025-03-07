@@ -129,8 +129,10 @@ class ReverbTestController:
             # 저장된 인증 데이터 확인
             central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
             try:
+                saved_auth = self.auth_manager.load_auth_data()
                 async with aiohttp.ClientSession() as session:
                     async with session.get(central_health_check_url, ssl=ssl_context if self.is_ssl else None) as response:
+                        print(f"response : {response}")
                         if response.status == 200:
                             logger.info('중앙 서버 정상 작동')
                             self.is_offline_mode = False
@@ -141,7 +143,6 @@ class ReverbTestController:
             except Exception as e:
                 logger.error(f'중앙 서버 연결 실패, 오프라인 모드로 전환합니다: {e}')
             
-            saved_auth = self.auth_manager.load_auth_data()
             if saved_auth:
                 if saved_auth['user_id'] == self.user_id and saved_auth['user_pwd'] == self.user_pwd:
                     logger.info('저장된 인증 정보로 오프라인 로그인 시도')
@@ -461,6 +462,7 @@ class ReverbTestController:
                         logger.info('메시지 수신')
                         purchase_data = json.loads(data['data'])['purchaseLog']
                         purchase_model = PurchaseData(
+                            
                             purchase_type=purchase_data['purchase_type'],
                             game_id=purchase_data['game_id'],
                             customer_id=purchase_data['customer_id'], 

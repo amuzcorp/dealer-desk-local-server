@@ -16,6 +16,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import models
 import schemas
 from database import get_db, get_db_direct
+
 @dataclass
 class DeviceNameChangeData:
     device_uid: str
@@ -51,6 +52,7 @@ async def send_socket_message(websocket: WebSocket, response_code: int, data: an
     WebSocket 메시지 전송을 위한 헬퍼 함수
     """
     print(f"send_socket_message : {data}")
+    print(f"websocket : {websocket}")
     await websocket.send_text(
         json.dumps({
             "response": response_code,
@@ -112,6 +114,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
         # 인증 대기
         while not auth_device:
+            db = get_db_direct()
             auth_device = db.query(models.AuthDeviceData).filter(
                 models.AuthDeviceData.device_uid == device_data.device_uid
             ).first()
@@ -125,11 +128,20 @@ async def websocket_endpoint(websocket: WebSocket):
         await send_socket_message(websocket, 200, {"event": "connected"})
         device_socket = DeviceSocketData(device_uid=device_data.device_uid, device_socket=websocket)
         device_socket_data.append(device_socket)
+        print("device_socket_data : ", device_socket_data)
         # 2초간 대기
         await asyncio.sleep(2)
         await connect_table_device_socket_event(device_data.device_uid)
         if(auth_device):
             await update_auth_device_status(auth_device.device_uid, True, db)
+        device_data_base : models.AuthDeviceData = db.query(models.AuthDeviceData).filter(
+            models.AuthDeviceData.device_uid == device_data.device_uid
+        ).first()
+        connected_table_data : models.TableData = db.query(models.TableData).filter(
+            models.TableData.id == device_data_base.connect_table_id
+        ).first()
+        if(connected_table_data):
+            await send_connect_game_socket_event(device_data.device_uid, connected_table_data.id)
 
         print("device_socket_data : ", device_socket_data)
         
@@ -176,7 +188,7 @@ async def connect_table_device_socket_event(device_uid: str):
                 return
                 
             # 테이블 찾기
-            table = db.query(models.TableData).filter(
+            table : models.TableData = db.query(models.TableData).filter(
                 models.TableData.id == auth_device.connect_table_id
             ).first()
             
@@ -273,9 +285,12 @@ async def send_connect_game_socket_event(device_uid: str, table_id: str):
             if not game_data:
                 print(f"게임을 찾을 수 없음: {game_id}")
                 return
-                
+            
+            print("game_data : ", game_data)
+            print("devivce datas : ", device_socket_data)
             # 디바이스 소켓 찾기
             for device in device_socket_data:
+                print("device : ", device.device_socket)
                 if device.device_uid == device_uid:
                     try:
                         print("device socket : ", device.device_socket)

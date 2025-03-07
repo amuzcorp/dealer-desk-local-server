@@ -164,7 +164,8 @@ class PurchaseData(Base):
     __tablename__ = "purchase_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    purchase_type = Column(String, index=True)  # BUYIN, REBUYIN 등
+    payment_type = Column(String, index=True)  # LOCAL_PAY, CASUAL_PAY
+    purchase_type = Column(String, index=True)  # Game 등
     game_id = Column(Integer, ForeignKey("game_data.id"), nullable=True)
     customer_id = Column(Integer, index=True)
     uuid = Column(String, index=True)
@@ -178,6 +179,7 @@ class PurchaseData(Base):
     def to_json(self):
         return {
             "id": self.id,
+            "payment_type": self.payment_type,
             "purchase_type": self.purchase_type,
             "game_id": self.game_id,
             "customer_id": self.customer_id,
