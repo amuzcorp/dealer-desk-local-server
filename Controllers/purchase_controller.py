@@ -261,6 +261,7 @@ async def create_buyin_purchase_data_by_user_id(user_id: int, game_id: int):
         
         # 구매 데이터 생성
         purchase = models.PurchaseData(
+            payment_type="LOCAL_PAY",
             purchase_type="BUYIN",
             customer_id=user_id,
             game_id=game_id,
@@ -276,6 +277,9 @@ async def create_buyin_purchase_data_by_user_id(user_id: int, game_id: int):
         db.add(purchase)
         db.commit()
         db.refresh(purchase)
+        
+        import main
+        await main.socket_controller.local_purchase_data(purchase)
         
         return JSONResponse(
             content={"response": 200, "message": "구매 데이터가 생성되었습니다", "data": purchase.to_json()},
@@ -314,6 +318,7 @@ async def create_rebuyin_purchase_data_by_user_id(user_id: int, game_id: int):
         
         # 구매 데이터 생성
         purchase = models.PurchaseData(
+            payment_type="LOCAL_PAY",
             purchase_type="REBUYIN",
             customer_id=user_id,
             game_id=game_id,
@@ -329,6 +334,9 @@ async def create_rebuyin_purchase_data_by_user_id(user_id: int, game_id: int):
         db.add(purchase)
         db.commit()
         db.refresh(purchase)
+        
+        import main
+        await main.socket_controller.local_purchase_data(purchase)
         
         return JSONResponse(
             content={"response": 200, "message": "구매 데이터가 생성되었습니다", "data": purchase.to_json()},

@@ -202,7 +202,7 @@ async def connect_table_device_socket_event(device_uid: str):
             )
             
             if device_socket:
-                device_socket.table_title = table.table_title
+                device_socket.table_title = table.title
                 await send_socket_message(
                     device_socket.device_socket,
                     200,

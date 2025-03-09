@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from central_socket import ReverbTestController
 import models, schemas, database
 import dataclasses
-from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller
+import socket
+from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller, point_controller
 
 # 데이터베이스 테이블 생성은 매장별로 처리되므로 여기서는 제거
 # models.Base.metadata.create_all(bind=database.engine)
@@ -42,6 +43,7 @@ app.include_router(game_controller.router)
 app.include_router(purchase_controller.router)
 app.include_router(user_controller.router)
 app.include_router(awarding_controller.router)
+app.include_router(point_controller.router)
 
 socket_controller: ReverbTestController = ReverbTestController()
 
@@ -52,6 +54,14 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# 서버의 ip 전달
+@app.get("/
+")
+async def get_ip_address():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.connect(("8.8.8.8", 80))
+    return {"ip_address": s.getsockname()[0]}
 
 @dataclasses.dataclass
 class LoginData:

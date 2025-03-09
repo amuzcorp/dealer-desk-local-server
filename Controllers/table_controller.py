@@ -40,9 +40,9 @@ async def get_tables():
             model_table = models.TableData(
                 id=table.id,  
                 game_id=table.game_id,
-                table_title=table.table_title,
-                current_player_count=table.current_player_count,
-                max_player_count=table.max_player_count,
+                title=table.title,
+                current_players=table.current_players,
+                max_players=table.max_players,
                 position=table.position,
                 size=table.size
             )
@@ -108,7 +108,9 @@ async def save_table(tables: List[schemas.TableData]):
             db.commit()
             for table in result:
                 db.refresh(table)
-            
+                
+            import main
+            await main.socket_controller.save_tables(result)
             return JSONResponse(
                 content={"response": 200, "data": "테이블 저장 성공"},
                 headers={"Content-Type": "application/json; charset=utf-8"},
@@ -255,7 +257,7 @@ async def connect_table_game_id(table_game_id: dict):
             )
         
         # 테이블 연결 로그 업데이트
-        table_connect_log = game.table_connect_log.copy() if game.table_connect_log else []
+        table_connect_log = game.table_connect_log if game.table_connect_log else []
         print(f"기존 로그: {table_connect_log}")
         
         # 새 로그 항목 생성

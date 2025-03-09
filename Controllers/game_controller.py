@@ -103,7 +103,7 @@ async def get_active_game_no_sse_data():
     db = get_db_direct()
     try:
         games = db.query(models.GameData).filter(
-            models.GameData.game_status.in_(["waiting", "in_progress"])
+            models.GameData.game_status.in_(["waiting", "in-progress"])
         ).all()
         
         if not games:
@@ -282,6 +282,9 @@ async def control_game_state(game_data: dict):
         db.commit()
         db.refresh(game)
         
+        import main
+        await main.socket_controller.update_game_data(game)
+        
         # 관련 디바이스에게 변경 알림
         table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
@@ -291,7 +294,7 @@ async def control_game_state(game_data: dict):
                 for device_socket in devices_sockets:
                     if device_socket.device_uid == table_connect_device.device_uid:
                         print(f"device_socket.device_uid : {device_socket.device_uid}")
-                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, game.id)
+                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
         
         # 중앙 서버에 보내기
         import main
@@ -315,6 +318,7 @@ async def control_game_time(game_id: str, time_dict: dict):
     """게임 시간을 제어합니다."""
     # 직접 세션 가져오기
     db = get_db_direct()
+    time = time_dict.get("game_time")
     try:
         # 게임 조회
         game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
@@ -325,23 +329,46 @@ async def control_game_time(game_id: str, time_dict: dict):
             )
             
         # 게임 시간 업데이트
-        if "game_start_time" in time_dict:
-            game.game_start_time = datetime.fromisoformat(time_dict["game_start_time"].replace('Z', '+00:00'))
+        # 시간 변경 로깅
+        print(f"시간 변경 전: game_calcul_time={game.game_calcul_time}, 변경값={time}분")
+        
+        # 만약 앞으로 돌리는 거라면(양수)
+        if time > 0:
+            game.game_calcul_time = game.game_calcul_time - timedelta(seconds=time)
+        # 만약 뒤로 돌리는 거라면(음수)
+        elif time < 0:
+            game.game_calcul_time = game.game_calcul_time + timedelta(seconds=abs(time))
             
-        if "game_stop_time" in time_dict:
-            game.game_stop_time = datetime.fromisoformat(time_dict["game_stop_time"].replace('Z', '+00:00'))
+        # 시간 변경 후 로깅
+        print(f"시간 변경 후: game_calcul_time={game.game_calcul_time}")
             
-        if "game_end_time" in time_dict:
-            game.game_end_time = datetime.fromisoformat(time_dict["game_end_time"].replace('Z', '+00:00'))
+        # # 만약 game stop time 이 not null이라면 동시 적용
+        # if game.game_stop_time:
+        #     # 정지 시간도 동일하게 조정
+        #     if time > 0:
+        #         game.game_stop_time = game.game_stop_time - timedelta(seconds=time)
+        #     elif time < 0:
+        #         game.game_stop_time = game.game_stop_time + timedelta(seconds=abs(time))
+        #     print(f"정지 시간 변경 후: game_stop_time={game.game_stop_time}")
             
-        if "game_calcul_time" in time_dict:
-            game.game_calcul_time = datetime.fromisoformat(time_dict["game_calcul_time"].replace('Z', '+00:00'))
-            
+        # 변경사항 저장
         db.commit()
         db.refresh(game)
         
+        # 소켓을 통해 변경사항 전송 (두 번 호출하여 확실히 전송)
         import main
         await main.socket_controller.update_game_data(game)
+        
+        # 관련 디바이스에게 변경 알림
+        table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        for table_data in table_datas:
+            table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets = device_controller.device_socket_data
+            for table_connect_device in table_connect_devices:
+                for device_socket in devices_sockets:
+                    if device_socket.device_uid == table_connect_device.device_uid:
+                        print(f"시간 변경 알림 전송: device_uid={device_socket.device_uid}")
+                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 시간이 업데이트되었습니다", "data": game.to_json()},
@@ -349,13 +376,13 @@ async def control_game_time(game_id: str, time_dict: dict):
         )
     except Exception as e:
         db.rollback()
+        print(f"게임 시간 업데이트 중 오류 발생: {str(e)}")
         return JSONResponse(
             content={"response": 500, "message": str(e)},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     finally:
         db.close()
-
 @router.get("/get-game-by-id/{game_id}")
 async def get_game_by_id(game_id: int):
     """특정 게임을 ID로 조회합니다."""

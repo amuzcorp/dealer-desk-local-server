@@ -40,6 +40,8 @@ async def create_preset(preset_data: schemas.PresetData):
         db.add(preset)
         db.commit()
         db.refresh(preset)
+        import main
+        await main.socket_controller.save_preset(presets=preset)
         return JSONResponse(
             content={"response": 200, "message": "프리셋이 저장되었습니다", "id": preset.id},
             headers={"Content-Type": "application/json; charset=utf-8"}
@@ -80,6 +82,11 @@ async def update_preset(preset_id: int, preset_data: schemas.PresetData):
         
         db.commit()
         db.refresh(preset)
+        
+        import main
+        print("prseet sended")
+        await main.socket_controller.save_preset(presets=preset)
+        
         return JSONResponse(
             content={"response": 200, "message": "프리셋이 업데이트되었습니다"},
             headers={"Content-Type": "application/json; charset=utf-8"}
@@ -166,6 +173,8 @@ async def delete_preset(preset_id: int):
         db.delete(preset)
         db.commit()
         
+        import main
+        await main.socket_controller.delete_preset(preset_id)
         return JSONResponse(
             content={"response": 200, "message": "프리셋이 삭제되었습니다"},
             headers={"Content-Type": "application/json; charset=utf-8"}

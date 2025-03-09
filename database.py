@@ -1,12 +1,16 @@
 from datetime import datetime
+import ssl
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 import logging
 from fastapi import Depends, Request, HTTPException
+import requests 
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import contextmanager
+import aiohttp
+import json
 
 # 로거 설정
 logger = logging.getLogger('DatabaseManager')
@@ -91,12 +95,219 @@ class DatabaseManager:
             
             # models 모듈 임포트
             import models
+            import main
             
             # 데이터베이스 파일이 없거나 테이블이 없으면 생성
             db_path = self.get_db_path(store_id)
             if not os.path.exists(db_path):
                 logger.info(f"매장 {store_id}의 새 데이터베이스 파일 생성")
                 Base.metadata.create_all(bind=engine)
+                db = self.session_makers[store_id]()
+                # 서버에 데이터 가져오기
+                try:
+                    # 오프라인 모드가 아닐 때만 서버에서 데이터 동기화 시도
+                    if not main.socket_controller.is_offline_mode:
+                        host_name = next((store['host'] for store in main.socket_controller.stores if store['id'] == store_id), None)
+                        request_url = f"http://{main.socket_controller.base_url}/api/sync/all/{host_name}"
+                        headers = {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            "Authorization": f"Bearer {main.socket_controller.bearer_token}"
+                        }
+                        logger.info(request_url)
+                        logger.info(f"Bearer 토큰: {main.socket_controller.bearer_token}")
+                        
+                        # 데이터베이스 디렉토리 확인 및 생성
+                        db_dir = os.path.dirname(db_path)
+                        if not os.path.exists(db_dir):
+                            os.makedirs(db_dir)
+                            logger.info(f"데이터베이스 디렉토리 생성: {db_dir}")
+                        
+                        # SSL 인증서 검증을 비활성화하는 컨텍스트 생성
+                        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+                        ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+                        ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
+                        ssl_context.check_hostname = False
+                        ssl_context.verify_mode = ssl.CERT_NONE
+                        
+                        session = requests.Session()
+                        response = session.get(request_url, headers=headers,)
+                        
+                        if response.status_code == 200:
+                            data = response.json()
+                            logger.info(f"매장 {store_id}의 데이터 동기화 성공")
+                            logger.info(f"매장 {store_id}의 데이터: {data}")
+                            
+                            # 데이터 저장 전에 트랜잭션 관리 개선
+                            try:
+                                # 테이블 데이터 저장
+                                if 'tables' in data and data['tables']:
+                                    for table in data['tables']:
+                                        # 테이블 데이터에서 필요한 필드만 추출하여 모델 생성
+                                        table_obj = {}
+                                        for key, value in table.items():
+                                            if hasattr(models.TableData, key):
+                                                # title이 {"ko": name} 형식으로 들어오는 경우 name만 추출
+                                                if key == "title" and isinstance(value, dict) and "ko" in value:
+                                                    table_obj[key] = value["ko"]
+                                                else:
+                                                    table_obj[key] = value
+                                        table_data = models.TableData(**table_obj)
+                                        db.add(table_data)
+                                    db.commit()
+                                
+                                # 프리셋 데이터 저장
+                                if 'presets' in data and data['presets']:
+                                    for preset in data['presets']:
+                                        preset_obj = {}
+                                        for key, value in preset.items():
+                                            if hasattr(models.PresetData, key):
+                                                preset_obj[key] = value
+                                        preset_data = models.PresetData(**preset_obj)
+                                        db.add(preset_data)
+                                    db.commit()
+                                
+                                # 게임 데이터 저장
+                                if 'games' in data and data['games']:
+                                    for game in data['games']:
+                                        game_obj = {}
+                                        for key, value in game.items():
+                                            if key == 'starting_chip':
+                                                print(f"starting_chip: {value}")
+                                                game_obj['starting_chip'] = value
+                                            elif key == 'starting_chips':
+                                                print(f"starting_chips -> starting_chip으로 변환: {value}")
+                                                game_obj['starting_chip'] = value
+                                            if hasattr(models.GameData, key):
+                                                # datetime 필드 처리
+                                                if key in ['game_start_time', 'game_calcul_time', 'game_stop_time', 'game_end_time'] and isinstance(value, str):
+                                                    try:
+                                                        if 'T' in value:  # ISO 형식
+                                                            game_obj[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                                        else:  # 일반 형식
+                                                            game_obj[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                                                    except ValueError:
+                                                        logger.warning(f"게임 날짜 형식 변환 실패: {key}={value}, None으로 설정")
+                                                        game_obj[key] = None
+                                                # title 필드 처리 (dict 형식인 경우)
+                                                elif key == 'title' and isinstance(value, dict) and 'ko' in value:
+                                                    game_obj[key] = value['ko']
+                                                # starting_chip 필드를 starting_chip으로 변환
+                                                    # JSON 필드는 그대로 저장 (문자열로 변환하지 않음)
+                                                elif key in ['game_in_player', 'table_connect_log', 'time_table_data', 'rebuyin_payment_chips', 
+                                                           'rebuyin_number_limits', 'addon_data', 'prize_settings', 'rebuy_cut_off']:
+                                                    # 문자열로 들어온 경우 JSON으로 파싱
+                                                    if isinstance(value, str):
+                                                        try:
+                                                            game_obj[key] = json.loads(value)
+                                                        except json.JSONDecodeError:
+                                                            logger.warning(f"JSON 파싱 실패: {key}={value}, 빈 배열로 설정")
+                                                            game_obj[key] = []
+                                                    else:
+                                                        game_obj[key] = value
+                                                else:
+                                                    game_obj[key] = value
+                                        game_data = models.GameData(**game_obj)
+                                        db.add(game_data)
+                                    db.commit()
+                                # 포인트 데이터 저장
+                                if 'points' in data and data['points']:
+                                    for point in data['points']:
+                                        point_obj = {}
+                                        for key, value in point.items():
+                                            if hasattr(models.PointHistoryData, key):
+                                                # datetime 필드 처리
+                                                if key in ['expire_at', 'created_at'] and isinstance(value, str):
+                                                    try:
+                                                        if 'T' in value:  # ISO 형식
+                                                            point_obj[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                                        else:  # 일반 형식
+                                                            point_obj[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                                                    except ValueError:
+                                                        logger.warning(f"날짜 형식 변환 실패: {key}={value}, None으로 설정")
+                                                        point_obj[key] = None
+                                                else:
+                                                    point_obj[key] = value
+                                        point_data = models.PointHistoryData(**point_obj)
+                                        db.add(point_data)
+                                    db.commit()
+                                
+                                # 고객 데이터 저장
+                                if 'customers' in data and data['customers']:
+                                    for customer in data['customers']:
+                                        customer_obj = {}
+                                        for key, value in customer.items():
+                                            if hasattr(models.UserData, key):
+                                                # datetime 문자열을 datetime 객체로 변환
+                                                if key in ['register_at', 'last_visit_at'] and isinstance(value, str):
+                                                    try:
+                                                        customer_obj[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                                                    except ValueError:
+                                                        try:
+                                                            # ISO 형식 시도
+                                                            customer_obj[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                                        except ValueError:
+                                                            logger.warning(f"날짜 형식 변환 실패: {key}={value}, 현재 시간으로 설정")
+                                                            customer_obj[key] = datetime.now()
+                                                else:
+                                                    customer_obj[key] = value
+                                        customer_data = models.UserData(**customer_obj)
+                                        db.add(customer_data)
+                                    db.commit()
+                                
+                                # 구매 데이터 저장
+                                if 'purchases' in data and data['purchases']:
+                                    for purchase in data['purchases']:
+                                        purchase_obj = {}
+                                        for key, value in purchase.items():
+                                            if hasattr(models.PurchaseData, key):
+                                                # datetime 필드 처리
+                                                if key.endswith('_at') and isinstance(value, str):
+                                                    try:
+                                                        if 'T' in value:  # ISO 형식
+                                                            purchase_obj[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                                        else:  # 일반 형식
+                                                            purchase_obj[key] = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
+                                                    except ValueError:
+                                                        logger.warning(f"날짜 형식 변환 실패: {key}={value}, 현재 시간으로 설정")
+                                                        purchase_obj[key] = datetime.now()
+                                                else:
+                                                    purchase_obj[key] = value
+                                        purchase_data = models.PurchaseData(**purchase_obj)
+                                        db.add(purchase_data)
+                                    db.commit()
+                                # 상금 내역 데이터 저장
+                                if 'awardings' in data and data['awardings']:
+                                    for awarding in data['awardings']:
+                                        awarding_obj = {}
+                                        for key, value in awarding.items():
+                                            if hasattr(models.AwardingHistoryData, key):
+                                                if key.endswith('_at') and isinstance(value, str):
+                                                    try:
+                                                        awarding_obj[key] = datetime.fromisoformat(value.replace('Z', '+00:00'))
+                                                    except ValueError:
+                                                        logger.warning(f"날짜 형식 변환 실패: {key}={value}, 현재 시간으로 설정")
+                                                        awarding_obj[key] = datetime.now()
+                                                else:
+                                                    awarding_obj[key] = value
+                                                    
+                                        awarding_data = models.AwardingHistoryData(**awarding_obj)
+                                        db.add(awarding_data)
+                                    db.commit()
+                                
+                            except Exception as tx_error:
+                                db.rollback()
+                                logger.error(f"데이터 저장 중 오류 발생: {tx_error}")
+                                raise
+                        else:
+                            logger.warning(f"매장 {store_id}의 데이터 동기화 실패: 상태 코드 {response.status_code}")
+                    else:
+                        logger.info(f"오프라인 모드로 실행 중이므로 매장 {store_id}의 데이터 동기화를 건너뜁니다")
+                except Exception as sync_error:
+                    logger.error(f"매장 {store_id}의 데이터 동기화 중 오류 발생: {sync_error}")
+                    # 동기화 실패해도 기본 테이블은 생성
+                finally:
+                    db.close()
             else:
                 # 기존 데이터베이스에 누락된 테이블이 있는지 확인하고 생성
                 logger.info(f"매장 {store_id}의 기존 데이터베이스 테이블 검사")

@@ -603,6 +603,35 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
 
+@router.put("/update-user-rebuy-in-order")
+async def update_user_rebuy_in_order(game_id: int, user_id: int, db: Session = Depends(get_db)):
+    game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+    if not game:
+        return JSONResponse(
+            content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    game_in_player = game.game_in_player.copy() if game.game_in_player else []
+    for player in game_in_player:
+        if player.get("customer_id") == user_id:
+            player["join_count"] += 1
+
+    db.query(models.GameData).filter(models.GameData.id == game_id).update(
+        {"game_in_player": game_in_player}
+    )
+    
+    db.commit()
+    db.refresh(game)
+
+    import main
+    await main.socket_controller.update_game_data(game)
+
+    return JSONResponse(
+        content={"response": 200, "message": "게임 플레이어 리버이 인 순서가 업데이트되었습니다"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+    
 @router.put("/update-user-in-game-addon")
 async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, db: Session = Depends(get_db)):
     game = db.query(models.GameData).filter(models.GameData.id == game_id).first()

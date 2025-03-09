@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Optional, Any, List
+import uuid
 
 """
 테이블 데이터
 """
 class TableDataBase(BaseModel):
-    table_title: str
+    title: str
     position: Dict[str, float] = {"x": 0, "y": 0}
     size: Dict[str, float] = {"width": 100, "height": 100}
 
@@ -14,14 +15,14 @@ class TableDataCreate(TableDataBase):
     pass
 
 class TableDataUpdate(BaseModel):
-    table_title: Optional[str] = None
+    title: Optional[str] = None
     position: Optional[Dict[str, float]] = None
     size: Optional[Dict[str, float]] = None
 
 class TableData(TableDataBase):
     id: Optional[int] = None
-    current_player_count: int
-    max_player_count: int
+    current_players: int
+    max_players: int
     
     class Config:
         from_attributes = True 
@@ -154,4 +155,30 @@ class AwardingHistory(AwardingHistoryBase):
     class Config:
         from_attributes = True 
     
+
+"""
+포인트 내역 데이터
+"""
+class PointHistoryDataBase(BaseModel):
+    id: Optional[int] = None
+    uuid: Optional[str] = str(uuid.uuid4())
+    customer_id: int
+    reason: str
+    amount: int
+    available_amount: int
+    is_expired: bool
+    expire_at: Optional[datetime] = datetime.now() + timedelta(days=365 * 99)
+    is_increase: bool
+    created_at: datetime
     
+class PointHistoryDataCreate(PointHistoryDataBase):
+    pass
+
+class PointHistoryDataUpdate(PointHistoryDataBase):
+    id: int
+    
+class PointHistoryData(PointHistoryDataBase):
+    id: Optional[int] = None
+    
+    class Config:
+        from_attributes = True 

@@ -8,9 +8,9 @@ class TableData(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     game_id = Column(Integer, nullable=True, index=True)
-    table_title = Column(String, index=True)
-    current_player_count = Column(Integer, default = 0)
-    max_player_count = Column(Integer, default = 12)
+    title = Column(String, index=True)
+    current_players = Column(Integer, default = 0)
+    max_players = Column(Integer, default = 12)
     position = Column(JSON, default = {"x" : 0, "y" : 0})
     size = Column(JSON, default = {"width" : 100, "height" : 100})
     
@@ -21,9 +21,9 @@ class TableData(Base):
         return {
                 "id" : self.id,
                 "game_id" : self.game_id,
-                "table_title" : self.table_title,
-                "current_player_count" : self.current_player_count,
-                "max_player_count" : self.max_player_count,
+                "title" : self.title,
+                "current_players" : self.current_players,
+                "max_players" : self.max_players,
                 "position" : self.position,
                 "size" : self.size
             }
@@ -150,7 +150,7 @@ class GameData(Base):
             "time_table_data" : self.time_table_data,
             "buy_in_price" : self.buy_in_price,
             "re_buy_in_price" : self.re_buy_in_price, 
-            "starting_chips" : self.starting_chip,
+            "starting_chip" : self.starting_chip,
             "rebuyin_payment_chips" : self.rebuyin_payment_chips,
             "rebuyin_number_limits" : self.rebuyin_number_limits,
             "addon_data" : self.addon_data,
@@ -240,3 +240,30 @@ class AwardingHistoryData(Base):
             "awarding_amount": self.awarding_amount,
         }
 
+class PointHistoryData(Base):
+    __tablename__ = "point_history_data"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    uuid = Column(String, unique=True, index=True)  # UUID 형식으로 고유해야 함
+    customer_id = Column(Integer, ForeignKey("user_data.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=True)
+    reason = Column(String, nullable=True, index=True)
+    amount = Column(Integer, default=0)  # 총 적립 포인트
+    available_amount = Column(Integer, default=0)  # 사용가능한 포인트
+    is_expired = Column(Boolean, default=False, index=True)  # 만료 여부
+    expire_at = Column(DateTime, nullable=True, index=True)  # 만료 날짜
+    is_increase = Column(Boolean, default=True, index=True)  # 증가인지 감소인지
+    created_at = Column(DateTime, default=datetime.now())
+    
+    def to_json(self):
+        return {
+            "id": self.id,
+            "uuid": self.uuid,
+            "customer_id": self.customer_id,
+            "reason": self.reason,
+            "amount": self.amount,
+            "available_amount": self.available_amount,
+            "is_expired": self.is_expired,
+            "expire_at": self.expire_at.isoformat() if self.expire_at else None,
+            "is_increase": self.is_increase,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

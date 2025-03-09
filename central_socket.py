@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+import uuid
 import certifi
 import websockets
 import aiohttp
@@ -104,6 +105,7 @@ class ReverbTestController:
     auth_event = None
     store_name = ""
     stores = []
+    store_host_name = ""
     selected_store = None  # 선택된 매장 정보
     _listening_task = None
     _reconnect_attempts = 0
@@ -115,6 +117,7 @@ class ReverbTestController:
         self.channel_name = "private-admin_penal."
         self.is_ssl = True
         self.base_url = "dealer-desk.dev.amuz.kr"
+        self.store_host_name = ""
         self.server_url = f"{'wss' if self.is_ssl else 'ws'}://{self.base_url}/app/hyx4ylczjr3sndkwqx8u"
         self.auth_event = asyncio.Event()
         self.queue_manager = MessageQueueManager()
@@ -194,13 +197,20 @@ class ReverbTestController:
                     'Accept': 'application/json'
                 }
                 logger.debug('온라인 로그인 시도')
+                # gzip 압축 지원 헤더 추가
+                headers['Accept-Encoding'] = 'gzip'
+                logger.debug('gzip 압축 지원 헤더 추가')
+                
                 async with session.post(
                     f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/login",
                     json=auth_data,
                     headers=headers,
                     ssl=ssl_context if self.is_ssl else None
                 ) as response:
-                    data = await response.json()
+                    # gzip으로 압축되어 있는지 확인
+                    if response.headers.get('Content-Encoding') == 'gzip':
+                        logger.info('gzip으로 압축된 응답을 받았습니다')
+                        data = await response.json()
                     if data:
                         # 성공적인 온라인 인증 시 데이터 저장
                         self.bearer_token = data['token']
@@ -245,6 +255,7 @@ class ReverbTestController:
             self.selected_store = selected_store
             self.tenant_id = selected_store['tenant_id']
             self.store_name = selected_store['name']
+            self.store_host_name = selected_store['host']
             logger.info(f'매장 선택: {self.store_name}')
             logger.info(f"오프라인 모드? {self.is_offline_mode}")
             # 오프라인 모드가 아닌 경우에만 소켓 연결 시도
@@ -511,7 +522,62 @@ class ReverbTestController:
                             db.refresh(customer_model)
                         finally:
                             db.close()
+                    elif data['event'] == 'App\\Events\\ToAdminPanel\\UsePointEvent':
+                        logger.info('포인트 내역 메시지 수신')
+                        point_history_data = json.loads(data['data'])['point']
+                        logger.info(f'포인트 내역 데이터: {point_history_data}')
                         
+                        # 한글 reason 처리 (이스케이프된 유니코드 문자열 디코딩)
+                        reason = point_history_data['reason']
+                        try:
+                            # 이스케이프된 유니코드 문자열인 경우 디코딩
+                            if '\\u' in reason:
+                                reason = reason.encode().decode('unicode_escape')
+                            logger.info(f'처리된 포인트 사용 이유: {reason}')
+                        except Exception as e:
+                            logger.error(f'포인트 사용 이유 디코딩 중 오류: {e}')
+                        
+                        point_history_input_data = models.PointHistoryData(
+                            customer_id=point_history_data['customer_id'],
+                            uuid=str(uuid.uuid4()),
+                            reason=reason,
+                            amount=point_history_data['point'],
+                            expire_at=datetime.now(),
+                            is_increase=False
+                        )
+                        db = get_db_direct()
+                        try:
+                            db.add(point_history_input_data)
+                            db.commit()
+                            db.refresh(point_history_input_data)
+                        finally:
+                            db.close()
+                    elif data['event'] == 'App\\Events\\ToAdminPanel\\ExitGameEvent':
+                        logger.info('게임 종료 메시지 수신')
+                        db = get_db_direct()
+                        try:
+                            print(f"data: {data}")
+                            print(f"data['data'] : {data['data']}")
+                            data_data = json.loads(data['data'])
+                            print(f"data_data['data'] : {data_data['data']}")
+                            game_id = data_data['data']['gameId']
+                            customer_id = data_data['data']['customerId']
+                            print(f"game_id: {game_id}, customer_id: {customer_id}")
+                            
+                            game_data:models.GameData = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+                            if(game_data):
+                                player = next(player for player in game_data.game_in_player if player['customer_id'] == customer_id)
+                                player['is_sit'] = False
+                                db.query(models.GameData).filter(models.GameData.id == game_id).update(
+                                    {"game_in_player": game_data.game_in_player}
+                                )
+                                db.commit()
+                                db.refresh(game_data)
+                                import main
+                                await main.socket_controller.update_game_data(game_data)
+
+                        finally:
+                            db.close()
                 except websockets.exceptions.ConnectionClosed:
                     logger.warning("WebSocket 연결이 닫혔습니다.")
                     await self.reset_state()
@@ -559,6 +625,38 @@ class ReverbTestController:
         logger.info(f'사용자 데이터 생성 메시지 전송 시도: 사용자 ID {user_data.id}')
         user_data_json = user_data.to_json()
         await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="RegisterCustomer", message=user_data_json)
+    
+    async def add_point_history_data(self, point_history_data:models.PointHistoryData):
+        """포인트 내역 데이터 생성 메시지를 보내는 메서드"""
+        logger.info(f'포인트 내역 데이터 생성 메시지 전송 시도: 포인트 내역 ID {point_history_data.id}') 
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="SavePoint", message={"customer_id":point_history_data.customer_id, 
+                                                                                                                                                              "reason":point_history_data.reason, 
+                                                                                                                                                              "point" : point_history_data.amount,
+                                                                                                                                                              "expire_at" : point_history_data.expire_at.isoformat()})
+        
+    async def save_tables(self, tables:list[models.TableData]):
+        """테이블 데이터 저장 메시지를 보내는 메서드"""
+        logger.info(f'테이블 데이터 저장 메시지 전송 시도: 테이블 ID {tables[0].id}')
+        tables_json = [table.to_json() for table in tables]
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="TableData", message=tables_json)
+    
+    async def save_preset(self, presets:models.PresetData):
+        """프리셋 데이터 저장 메시지를 보내는 메서드"""
+        logger.info(f'프리셋 데이터 저장 메시지 전송 시도: 프리셋 ID {presets.id}')
+        presets_json = presets.to_json()
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="PresetData", message=presets_json)
+    async def delete_preset(self, preset_id:int):
+        """프리셋 데이터 삭제 메시지를 보내는 메서드"""
+        logger.info(f'프리셋 데이터 삭제 메시지 전송 시도: 프리셋 ID {preset_id}')
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="PresetDelete", message=preset_id)
+    async def add_awarding_history_data(self, awarding_history_data:models.AwardingHistoryData):
+        """상금 내역 데이터 생성 메시지를 보내는 메서드"""
+        logger.info(f'상금 내역 데이터 생성 메시지 전송 시도: 상금 내역 ID {awarding_history_data.id}')
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="Awarding", message=awarding_history_data.to_json())
+    async def local_purchase_data(self, purchase_data:models.PurchaseData):
+        """로컬 구매 데이터 생성 메시지를 보내는 메서드"""
+        logger.info(f'로컬 구매 데이터 생성 메시지 전송 시도: 구매 ID {purchase_data.id}')
+        await self.send_message("App\\Events\\WebSocketMessageListener", channel_name=self.channel_name+self.tenant_id, data_type="LocalPurchaseLog", message=purchase_data.to_json())
     
     async def send_message(self, event_name, channel_name, data_type, message):
         """메시지를 WebSocket을 통해 전송하는 메서드"""

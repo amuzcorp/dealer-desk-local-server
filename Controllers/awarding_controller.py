@@ -42,6 +42,11 @@ async def create_awarding_history(awarding_history: schemas.AwardingHistoryCreat
     db.add(db_awarding_history)
     db.commit()
     db.refresh(db_awarding_history)
+    
+    import main
+    
+    await main.socket_controller.add_awarding_history_data(db_awarding_history)
+    
     return JSONResponse(
         content={"response": 200, "message": "Awarding history created successfully", "data": db_awarding_history.to_json()},
         headers={"Content-Type": "application/json; charset=utf-8"}
