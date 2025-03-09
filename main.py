@@ -56,8 +56,7 @@ async def health_check():
     return {"status": "healthy"}
 
 # 서버의 ip 전달
-@app.get("/
-")
+@app.get("/get-ip-address")
 async def get_ip_address():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     s.connect(("8.8.8.8", 80))
