@@ -19,7 +19,7 @@ import models
 # import app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from Controllers import device_controller, table_controller
+from Controllers import device_controller, device_socket_manager, table_controller
 import models
 import schemas
 from database import get_db, get_db_direct
@@ -286,15 +286,15 @@ async def control_game_state(game_data: dict):
         await main.socket_controller.update_game_data(game)
         
         # 관련 디바이스에게 변경 알림
-        table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        table_datas : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
             table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
-            devices_sockets = device_controller.device_socket_data;
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
             for table_connect_device in table_connect_devices:
-                for device_socket in devices_sockets:
+                for device_socket in devices_sockets.values():
                     if device_socket.device_uid == table_connect_device.device_uid:
                         print(f"device_socket.device_uid : {device_socket.device_uid}")
-                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
         
         # 중앙 서버에 보내기
         import main
@@ -360,15 +360,15 @@ async def control_game_time(game_id: str, time_dict: dict):
         await main.socket_controller.update_game_data(game)
         
         # 관련 디바이스에게 변경 알림
-        table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        table_datas: List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
-            table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
-            devices_sockets = device_controller.device_socket_data
+            table_connect_devices: List[models.AuthDeviceData] = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
             for table_connect_device in table_connect_devices:
-                for device_socket in devices_sockets:
+                for device_socket in devices_sockets.values():
                     if device_socket.device_uid == table_connect_device.device_uid:
                         print(f"시간 변경 알림 전송: device_uid={device_socket.device_uid}")
-                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 시간이 업데이트되었습니다", "data": game.to_json()},

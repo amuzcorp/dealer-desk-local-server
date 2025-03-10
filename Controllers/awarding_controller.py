@@ -71,6 +71,7 @@ async def get_awarding_history_by_game_id(game_id: int):
     response_data = []
     for awarding_history in db_awarding_history:
         response_data.append(awarding_history.to_json())
+
     return JSONResponse(
         content={"response": 200, "message": "Awarding history created successfully", "data": response_data},
         headers={"Content-Type": "application/json; charset=utf-8"}

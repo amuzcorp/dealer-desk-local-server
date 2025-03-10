@@ -5,7 +5,7 @@ from typing import List
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
-from Controllers import device_controller
+from Controllers import device_controller, device_socket_manager
 
 import json
 import sys
@@ -83,7 +83,7 @@ async def save_table(tables: List[schemas.TableData]):
                 device.connect_table_id = None
                 db.commit()
                 print(f"디바이스 연결 해제: {device.device_uid}")
-                await device_controller.connect_table_device_socket_event(device.device_uid)
+                await device_socket_manager.socket_manager.handle_game_connection(device.device_uid, table_to_delete.id)
                 
             db.delete(table_to_delete)
         
@@ -199,7 +199,7 @@ async def disconnect_game(table_id: str):
         if devices:
             for device in devices:
                 print(f"테이블에 연결된 디바이스 UID: {device.device_uid}")
-                await device_controller.send_connect_game_socket_event(device.device_uid, table_id)
+                await device_socket_manager.socket_manager.handle_game_connection(device.device_uid, table_id)
         else:
             print(f"테이블 {table_id}에 연결된 디바이스가 없습니다.")
         
@@ -283,7 +283,7 @@ async def connect_table_game_id(table_game_id: dict):
         if devices:
             for device in devices:
                 print(f"테이블에 연결된 디바이스 UID: {device.device_uid}")
-                await device_controller.send_connect_game_socket_event(device.device_uid, table_id)
+                await device_socket_manager.socket_manager.handle_game_connection(device.device_uid, table_id)
         else:
             print(f"테이블 {table_id}에 연결된 디바이스가 없습니다.")
         

@@ -7,7 +7,7 @@ from typing import List
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
-from Controllers import device_controller
+from Controllers import device_controller, device_socket_manager
 
 import json
 import sys
@@ -215,6 +215,9 @@ async def update_user(user_id: int, user_data: schemas.UserDataUpdate):
         user_json["register_at"] = user_json["register_at"].isoformat()
         user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
         
+        import main
+        await main.socket_controller.register_customer_data(user)
+        
         return JSONResponse(
             content={"response": 200, "message": "사용자 정보가 업데이트되었습니다", "data": user_json},
             headers={"Content-Type": "application/json; charset=utf-8"}
@@ -323,13 +326,13 @@ async def create_guest_user(game_id: str):
         # 관련 디바이스에게 변경 알림
         table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
-            table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
-            devices_sockets = device_controller.device_socket_data;
+            table_connect_devices : List[models.AuthDeviceData] = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
             for table_connect_device in table_connect_devices:
-                for device_socket in devices_sockets:
+                for device_socket in devices_sockets.values():
                     if device_socket.device_uid == table_connect_device.device_uid:
                         print(f"device_socket.device_uid : {device_socket.device_uid}")
-                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
         # 시간 포맷 변환
         # user_json["register_at"] = user_json["register_at"].isoformat() if user_json["register_at"] else None
         # user_json["last_visit_at"] = user_json["last_visit_at"].isoformat() if user_json["last_visit_at"] else None
@@ -499,15 +502,15 @@ async def update_user_in_game_sit_status(game_id: int, user_id: int, is_sit: boo
         await main.socket_controller.update_game_data(game)
         
         # 관련 디바이스에게 변경 알림
-        table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        table_datas : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
-            table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
-            devices_sockets = device_controller.device_socket_data;
+            table_connect_devices : List[models.AuthDeviceData] = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
             for table_connect_device in table_connect_devices:
-                for device_socket in devices_sockets:
+                for device_socket in devices_sockets.values():
                     if device_socket.device_uid == table_connect_device.device_uid:
                         print(f"device_socket.device_uid : {device_socket.device_uid}")
-                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
         
         return JSONResponse(
             content={"response": 200, "message": "착석 상태가 업데이트되었습니다"},
@@ -563,15 +566,15 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase
         await main.socket_controller.update_game_data(game)
         
         # 관련 디바이스에게 변경 알림
-        table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        table_datas : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
         for table_data in table_datas:
-            table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
-            devices_sockets = device_controller.device_socket_data;
+            table_connect_devices : List[models.AuthDeviceData] = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
             for table_connect_device in table_connect_devices:
-                for device_socket in devices_sockets:
+                for device_socket in devices_sockets.values():
                     if device_socket.device_uid == table_connect_device.device_uid:
                         print(f"device_socket.device_uid : {device_socket.device_uid}")
-                        await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
         
         return JSONResponse(
             content={"response": 200, "message": "게임 참여 횟수가 업데이트되었습니다"},
@@ -587,7 +590,7 @@ async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase
         db.close()
 
 @router.put("/update-user-rebuy-in")
-async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends(get_db)):
+async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends(get_db_direct)):
     game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
     if not game:
         return JSONResponse(
@@ -625,11 +628,11 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
     await main.socket_controller.update_game_data(game)
 
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
-    tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
+    tables : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
     for table in tables:
         devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
         for device in devices:
-            await device_controller.send_connect_game_socket_event(device.device_uid, table.id)   
+            await device_socket_manager.socket_manager.handle_game_connection(device.device_uid, table.id)   
 
     return JSONResponse(
         content={"response": 200, "message": "게임 플레이어 리버이 인 상태가 업데이트되었습니다"},
@@ -664,12 +667,12 @@ async def update_user_rebuy_in_order(game_id: int, user_id: int, db: Session = D
     table_datas = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
     for table_data in table_datas:
         table_connect_devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
-        devices_sockets = device_controller.device_socket_data;
+        devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
         for table_connect_device in table_connect_devices:
-            for device_socket in devices_sockets:
+            for device_socket in devices_sockets.values():
                 if device_socket.device_uid == table_connect_device.device_uid:
                     print(f"device_socket.device_uid : {device_socket.device_uid}")
-                    await device_controller.send_connect_game_socket_event(device_socket.device_uid, table_data.id)
+                    await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
 
 
     return JSONResponse(
@@ -716,13 +719,52 @@ async def update_user_in_game_addon(game_id: int, user_id: int, is_addon: bool, 
     await main.socket_controller.update_game_data(game)
     
     # 테이블에 연결된 디바이스에 업데이트된 게임 정보 전송
-    tables = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
+    tables : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
     for table in tables:
         devices = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table.id).all()
         for device in devices:
-            await device_controller.send_connect_game_socket_event(device.device_uid, table.id)
+            await device_socket_manager.socket_manager.handle_game_connection(device.device_uid, table.id)
 
     return JSONResponse(
         content={"response": 200, "message": "게임 플레이어 애드온 상태가 업데이트되었습니다"},
+        headers={"Content-Type": "application/json; charset=utf-8"}
+    )
+
+@router.put("/update-user-data")
+async def update_user_data(user_data: schemas.UserDataUpdate, db: Session = Depends(get_db_direct)):
+    user = db.query(models.UserData).filter(models.UserData.id == user_data.id).first()
+    
+    if not user:
+        return JSONResponse(
+            content={"response": 404, "message": "사용자를 찾을 수 없습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    
+    user.name = user_data.name
+    user.phone_number = user_data.phone_number
+    user.email = user_data.email
+    user.game_join_count = user_data.game_join_count
+    user.visit_count = user_data.visit_count
+    user.register_at = user_data.register_at
+    user.last_visit_at = user_data.last_visit_at
+    user.remark = user_data.remark
+    
+    print(f"user.name: {user.name}")
+    print(f"user.phone_number: {user.phone_number}")
+    print(f"user.email: {user.email}")
+    print(f"user.game_join_count: {user.game_join_count}")
+    print(f"user.visit_count: {user.visit_count}")
+    print(f"user.register_at: {user.register_at}")
+    print(f"user.last_visit_at: {user.last_visit_at}")
+    print(f"user.remark: {user.remark}")
+    
+    db.commit()
+    db.refresh(user)
+    
+    import main
+    await main.socket_controller.register_customer_data(user)
+    
+    return JSONResponse(
+        content={"response": 200, "message": "사용자 정보가 업데이트되었습니다"},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )

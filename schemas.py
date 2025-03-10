@@ -115,8 +115,6 @@ class UserDataBase(BaseModel):
     visit_count: int
     register_at: datetime
     last_visit_at: datetime
-    point: int
-    total_point: int
     remark: str
     
 class UserDataCreate(UserDataBase):

@@ -6,7 +6,7 @@ from central_socket import ReverbTestController
 import models, schemas, database
 import dataclasses
 import socket
-from Controllers import game_controller, purchase_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller, point_controller
+from Controllers import game_controller, purchase_controller, qr_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller, point_controller
 
 # 데이터베이스 테이블 생성은 매장별로 처리되므로 여기서는 제거
 # models.Base.metadata.create_all(bind=database.engine)
@@ -44,7 +44,7 @@ app.include_router(purchase_controller.router)
 app.include_router(user_controller.router)
 app.include_router(awarding_controller.router)
 app.include_router(point_controller.router)
-
+app.include_router(qr_controller.router)
 socket_controller: ReverbTestController = ReverbTestController()
 
 @app.get("/")
