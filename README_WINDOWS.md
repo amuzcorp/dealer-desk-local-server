@@ -18,9 +18,19 @@ pip install -r requirements.txt
 
 ## 윈도우 애플리케이션 빌드
 
-### 1. 아이콘 생성
+### 1. Python DLL 파일 확인 (중요)
 
-먼저 애플리케이션 아이콘을 생성합니다:
+빌드 전에 Python DLL 파일 위치를 확인합니다:
+
+```bash
+python find_python_dlls.py
+```
+
+이 명령어는 시스템에서 Python DLL 파일을 찾아 출력합니다. 출력된 정보를 확인하고 필요한 경우 `build_windows.py` 파일의 `--add-binary` 옵션을 수정하세요.
+
+### 2. 아이콘 생성
+
+애플리케이션 아이콘을 생성합니다:
 
 ```bash
 python create_icon.py
@@ -28,7 +38,7 @@ python create_icon.py
 
 이 명령어는 `assets` 폴더에 `dealer_desk_icon.ico` 파일을 생성합니다.
 
-### 2. 애플리케이션 빌드
+### 3. 애플리케이션 빌드
 
 다음 명령어로 윈도우 애플리케이션을 빌드합니다:
 
@@ -77,6 +87,29 @@ python win_tray_app.py
 - **종료**: 애플리케이션을 종료합니다.
 
 ## 문제 해결
+
+### Python DLL 파일 오류
+
+"pythonXX.dll을 찾을 수 없습니다" 오류가 발생하는 경우:
+
+1. `find_python_dlls.py` 스크립트를 실행하여 DLL 파일 위치 확인
+2. 발견된 DLL 파일을 `dist/DealerDeskServer` 폴더에 직접 복사
+3. 또는 다음 명령어로 콘솔 창이 표시되는 버전으로 빌드하여 오류 메시지 확인:
+   ```bash
+   python build_windows.py --icon assets/dealer_desk_icon.ico --console
+   ```
+
+### 수동으로 DLL 파일 복사하기
+
+빌드 후 실행 파일이 작동하지 않는 경우, 다음 DLL 파일을 수동으로 복사하세요:
+
+1. Python 설치 폴더에서 다음 파일을 찾습니다:
+   - `pythonXX.dll` (XX는 Python 버전, 예: python39.dll)
+   - `vcruntime140.dll`
+   - `vcruntime140_1.dll` (있는 경우)
+   - `msvcp140.dll` (있는 경우)
+
+2. 이 파일들을 `dist/DealerDeskServer` 폴더에 복사합니다.
 
 ### 서버가 시작되지 않는 경우
 

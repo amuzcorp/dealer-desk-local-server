@@ -38,6 +38,13 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
         "--clean",
         "--name", "DealerDeskServer",
         "--add-data", f"main.py{os.pathsep}.",
+        "--collect-all", "uvicorn",
+        "--collect-all", "fastapi",
+        "--collect-all", "starlette",
+        "--collect-all", "pydantic",
+        "--collect-all", "sqlalchemy",
+        "--collect-all", "pystray",
+        "--collect-all", "PIL",
     ]
     
     # 아이콘 추가
@@ -53,6 +60,12 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
     # 콘솔 창 표시 여부
     if not console:
         cmd.append("--noconsole")
+    
+    # Python DLL 포함 설정
+    cmd.append("--copy-metadata=sqlalchemy")
+    cmd.append("--copy-metadata=pydantic")
+    cmd.append("--copy-metadata=fastapi")
+    cmd.append("--copy-metadata=starlette")
     
     # 추가 파일 및 모듈 포함
     cmd.extend([
@@ -70,6 +83,18 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
         "--hidden-import", "fastapi",
         "--hidden-import", "sqlalchemy",
         "--hidden-import", "pydantic",
+        "--hidden-import", "PIL",
+        "--hidden-import", "PIL._tkinter_finder",
+        "--hidden-import", "PIL.Image",
+        "--hidden-import", "PIL.ImageDraw",
+        "--hidden-import", "pystray._win32",
+    ])
+    
+    # Python 버전 확인 및 DLL 복사 설정
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    cmd.extend([
+        "--add-binary", f"{sys.prefix}/python{python_version.replace('.', '')}.dll{os.pathsep}.",
+        "--add-binary", f"{sys.prefix}/vcruntime140.dll{os.pathsep}.",
     ])
     
     # 메인 스크립트 지정
@@ -99,6 +124,49 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
                     else:
                         os.makedirs(dist_dir / dir_name, exist_ok=True)
                         shutil.copytree(src_dir, dist_dir / dir_name)
+            
+            # Python DLL 파일 직접 복사 (추가 보장)
+            if not one_file:
+                python_dll = f"python{python_version.replace('.', '')}.dll"
+                vcruntime_dll = "vcruntime140.dll"
+                
+                # Python DLL 파일 찾기
+                python_dll_path = None
+                vcruntime_dll_path = None
+                
+                for path in os.environ["PATH"].split(os.pathsep):
+                    dll_path = os.path.join(path, python_dll)
+                    if os.path.exists(dll_path):
+                        python_dll_path = dll_path
+                        break
+                
+                for path in os.environ["PATH"].split(os.pathsep):
+                    dll_path = os.path.join(path, vcruntime_dll)
+                    if os.path.exists(dll_path):
+                        vcruntime_dll_path = dll_path
+                        break
+                
+                # Python 설치 디렉토리에서 DLL 찾기
+                if not python_dll_path:
+                    python_dll_path = os.path.join(sys.prefix, python_dll)
+                
+                if not vcruntime_dll_path:
+                    vcruntime_dll_path = os.path.join(sys.prefix, vcruntime_dll)
+                
+                # DLL 파일 복사
+                if python_dll_path and os.path.exists(python_dll_path):
+                    dst_dll_path = dist_dir / "DealerDeskServer" / python_dll
+                    shutil.copy2(python_dll_path, dst_dll_path)
+                    print(f"Python DLL 파일 복사됨: {python_dll_path} -> {dst_dll_path}")
+                else:
+                    print(f"경고: Python DLL 파일({python_dll})을 찾을 수 없습니다.")
+                
+                if vcruntime_dll_path and os.path.exists(vcruntime_dll_path):
+                    dst_dll_path = dist_dir / "DealerDeskServer" / vcruntime_dll
+                    shutil.copy2(vcruntime_dll_path, dst_dll_path)
+                    print(f"VCRuntime DLL 파일 복사됨: {vcruntime_dll_path} -> {dst_dll_path}")
+                else:
+                    print(f"경고: VCRuntime DLL 파일({vcruntime_dll})을 찾을 수 없습니다.")
             
             print("필요한 파일 복사 완료")
         except Exception as e:
