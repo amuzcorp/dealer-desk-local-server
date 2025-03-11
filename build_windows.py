@@ -4,6 +4,8 @@ import shutil
 import subprocess
 from pathlib import Path
 import argparse
+import site
+import glob
 
 def build_windows_app(one_file=False, console=False, icon_path=None):
     """
@@ -31,6 +33,54 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
     if dist_dir.exists():
         print("기존 dist 디렉토리를 정리합니다...")
         shutil.rmtree(dist_dir)
+    
+    # Python 버전 확인
+    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    python_dll = f"python{python_version.replace('.', '')}.dll"
+    
+    # Python DLL 파일 찾기
+    python_dll_paths = []
+    
+    # 1. Python 설치 디렉토리에서 찾기
+    python_dir_dll = os.path.join(sys.prefix, python_dll)
+    if os.path.exists(python_dir_dll):
+        python_dll_paths.append(python_dir_dll)
+        print(f"Python 설치 디렉토리에서 DLL 파일 발견: {python_dir_dll}")
+    
+    # 2. Python 실행 파일 디렉토리에서 찾기
+    python_exe_dir = os.path.dirname(sys.executable)
+    python_exe_dll = os.path.join(python_exe_dir, python_dll)
+    if os.path.exists(python_exe_dll) and python_exe_dll not in python_dll_paths:
+        python_dll_paths.append(python_exe_dll)
+        print(f"Python 실행 파일 디렉토리에서 DLL 파일 발견: {python_exe_dll}")
+    
+    # 3. 시스템 경로에서 찾기
+    for path in os.environ["PATH"].split(os.pathsep):
+        dll_path = os.path.join(path, python_dll)
+        if os.path.exists(dll_path) and dll_path not in python_dll_paths:
+            python_dll_paths.append(dll_path)
+            print(f"시스템 경로에서 DLL 파일 발견: {dll_path}")
+    
+    # 관련 DLL 파일 찾기
+    related_dlls = ["vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"]
+    related_dll_paths = []
+    
+    for related_dll in related_dlls:
+        # Python 설치 디렉토리에서 찾기
+        dll_path = os.path.join(sys.prefix, related_dll)
+        if os.path.exists(dll_path) and dll_path not in related_dll_paths:
+            related_dll_paths.append(dll_path)
+            print(f"관련 DLL 파일 발견: {dll_path}")
+        
+        # Python 실행 파일 디렉토리에서 찾기
+        dll_path = os.path.join(python_exe_dir, related_dll)
+        if os.path.exists(dll_path) and dll_path not in related_dll_paths:
+            related_dll_paths.append(dll_path)
+            print(f"관련 DLL 파일 발견: {dll_path}")
+    
+    # 사이트 패키지 디렉토리 찾기
+    site_packages = site.getsitepackages()
+    print(f"사이트 패키지 디렉토리: {site_packages}")
     
     # 기본 명령어 구성
     cmd = [
@@ -88,14 +138,18 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
         "--hidden-import", "PIL.Image",
         "--hidden-import", "PIL.ImageDraw",
         "--hidden-import", "pystray._win32",
+        "--hidden-import", "win32api",
+        "--hidden-import", "win32con",
+        "--hidden-import", "win32gui",
     ])
     
-    # Python 버전 확인 및 DLL 복사 설정
-    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
-    cmd.extend([
-        "--add-binary", f"{sys.prefix}/python{python_version.replace('.', '')}.dll{os.pathsep}.",
-        "--add-binary", f"{sys.prefix}/vcruntime140.dll{os.pathsep}.",
-    ])
+    # Python DLL 파일 추가
+    for dll_path in python_dll_paths:
+        cmd.extend(["--add-binary", f"{dll_path}{os.pathsep}."])
+    
+    # 관련 DLL 파일 추가
+    for dll_path in related_dll_paths:
+        cmd.extend(["--add-binary", f"{dll_path}{os.pathsep}."])
     
     # 메인 스크립트 지정
     cmd.append("win_tray_app.py")
@@ -127,46 +181,32 @@ def build_windows_app(one_file=False, console=False, icon_path=None):
             
             # Python DLL 파일 직접 복사 (추가 보장)
             if not one_file:
-                python_dll = f"python{python_version.replace('.', '')}.dll"
-                vcruntime_dll = "vcruntime140.dll"
-                
-                # Python DLL 파일 찾기
-                python_dll_path = None
-                vcruntime_dll_path = None
-                
-                for path in os.environ["PATH"].split(os.pathsep):
-                    dll_path = os.path.join(path, python_dll)
+                # Python DLL 파일 복사
+                for dll_path in python_dll_paths:
                     if os.path.exists(dll_path):
-                        python_dll_path = dll_path
-                        break
+                        dll_name = os.path.basename(dll_path)
+                        dst_dll_path = dist_dir / "DealerDeskServer" / dll_name
+                        shutil.copy2(dll_path, dst_dll_path)
+                        print(f"Python DLL 파일 복사됨: {dll_path} -> {dst_dll_path}")
                 
-                for path in os.environ["PATH"].split(os.pathsep):
-                    dll_path = os.path.join(path, vcruntime_dll)
+                # 관련 DLL 파일 복사
+                for dll_path in related_dll_paths:
                     if os.path.exists(dll_path):
-                        vcruntime_dll_path = dll_path
-                        break
+                        dll_name = os.path.basename(dll_path)
+                        dst_dll_path = dist_dir / "DealerDeskServer" / dll_name
+                        shutil.copy2(dll_path, dst_dll_path)
+                        print(f"관련 DLL 파일 복사됨: {dll_path} -> {dst_dll_path}")
                 
-                # Python 설치 디렉토리에서 DLL 찾기
-                if not python_dll_path:
-                    python_dll_path = os.path.join(sys.prefix, python_dll)
-                
-                if not vcruntime_dll_path:
-                    vcruntime_dll_path = os.path.join(sys.prefix, vcruntime_dll)
-                
-                # DLL 파일 복사
-                if python_dll_path and os.path.exists(python_dll_path):
-                    dst_dll_path = dist_dir / "DealerDeskServer" / python_dll
-                    shutil.copy2(python_dll_path, dst_dll_path)
-                    print(f"Python DLL 파일 복사됨: {python_dll_path} -> {dst_dll_path}")
-                else:
-                    print(f"경고: Python DLL 파일({python_dll})을 찾을 수 없습니다.")
-                
-                if vcruntime_dll_path and os.path.exists(vcruntime_dll_path):
-                    dst_dll_path = dist_dir / "DealerDeskServer" / vcruntime_dll
-                    shutil.copy2(vcruntime_dll_path, dst_dll_path)
-                    print(f"VCRuntime DLL 파일 복사됨: {vcruntime_dll_path} -> {dst_dll_path}")
-                else:
-                    print(f"경고: VCRuntime DLL 파일({vcruntime_dll})을 찾을 수 없습니다.")
+                # PyWin32 DLL 파일 복사
+                pywin32_dlls = ["pythoncom*.dll", "pywintypes*.dll"]
+                for pattern in pywin32_dlls:
+                    for site_pkg in site_packages:
+                        for dll_path in glob.glob(os.path.join(site_pkg, pattern)):
+                            if os.path.exists(dll_path):
+                                dll_name = os.path.basename(dll_path)
+                                dst_dll_path = dist_dir / "DealerDeskServer" / dll_name
+                                shutil.copy2(dll_path, dst_dll_path)
+                                print(f"PyWin32 DLL 파일 복사됨: {dll_path} -> {dst_dll_path}")
             
             print("필요한 파일 복사 완료")
         except Exception as e:

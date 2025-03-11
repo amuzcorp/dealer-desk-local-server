@@ -12,6 +12,14 @@ import socket
 import json
 from pathlib import Path
 
+# PyWin32 라이브러리 명시적 가져오기
+try:
+    import win32api
+    import win32con
+    import win32gui
+except ImportError:
+    pass  # macOS 등 다른 플랫폼에서는 무시
+
 class DealerDeskTray:
     def __init__(self):
         self.icon = None
@@ -98,28 +106,39 @@ class DealerDeskTray:
                 if getattr(sys, 'frozen', False):
                     # PyInstaller로 패키징된 경우
                     script_path = os.path.join(sys._MEIPASS, "main.py")
+                    self.log(f"패키징된 환경에서 실행 중: {script_path}")
                 else:
                     # 일반 Python 스크립트로 실행되는 경우
                     script_path = os.path.join(self.app_dir, "main.py")
+                    self.log(f"개발 환경에서 실행 중: {script_path}")
                 
                 # 환경 변수 설정
                 env = os.environ.copy()
                 env["PYTHONUNBUFFERED"] = "1"
                 
                 # 서버 프로세스 시작
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0  # SW_HIDE
-                
-                self.process = subprocess.Popen(
-                    [sys.executable, script_path],
-                    cwd=self.app_dir,
-                    env=env,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    startupinfo=startupinfo,
-                    creationflags=subprocess.CREATE_NO_WINDOW
-                )
+                if os.name == 'nt':  # Windows
+                    startupinfo = subprocess.STARTUPINFO()
+                    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                    startupinfo.wShowWindow = 0  # SW_HIDE
+                    
+                    self.process = subprocess.Popen(
+                        [sys.executable, script_path],
+                        cwd=self.app_dir,
+                        env=env,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        startupinfo=startupinfo,
+                        creationflags=subprocess.CREATE_NO_WINDOW
+                    )
+                else:  # macOS, Linux 등
+                    self.process = subprocess.Popen(
+                        [sys.executable, script_path],
+                        cwd=self.app_dir,
+                        env=env,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
                 
                 self.is_running = True
                 self.icon.icon = self.create_icon((0, 200, 0))  # 초록색 - 실행 중
@@ -194,7 +213,10 @@ class DealerDeskTray:
     def open_log_file(self, _):
         """로그 파일 열기"""
         if os.path.exists(self.log_file):
-            os.startfile(self.log_file)
+            if os.name == 'nt':  # Windows
+                os.startfile(self.log_file)
+            else:  # macOS, Linux 등
+                subprocess.call(['open', self.log_file])
         else:
             self.log("로그 파일이 존재하지 않습니다.")
             
