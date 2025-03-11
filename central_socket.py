@@ -130,7 +130,7 @@ class ReverbTestController:
             logger.debug(f'로그인 시도 - User ID: {self.user_id}, User PWD: {self.user_pwd}')
             
             # 저장된 인증 데이터 확인
-            central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
+            central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(401) if not self.is_ssl else '')}/api/health"
             try:
                 saved_auth = self.auth_manager.load_auth_data()
                 async with aiohttp.ClientSession() as session:
@@ -162,7 +162,7 @@ class ReverbTestController:
         """오프라인 로그인 처리 메서드"""
         self.stores = saved_auth['stores']
         # 중앙 서버 상태 확인
-        central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/health"
+        central_health_check_url = f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(401) if not self.is_ssl else '')}/api/health"
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(central_health_check_url, ssl=ssl_context if self.is_ssl else None) as response:
@@ -202,7 +202,7 @@ class ReverbTestController:
                 logger.debug('gzip 압축 지원 헤더 추가')
                 
                 async with session.post(
-                    f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/login",
+                    f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(401) if not self.is_ssl else '')}/api/login",
                     json=auth_data,
                     headers=headers,
                     ssl=ssl_context if self.is_ssl else None
@@ -306,7 +306,7 @@ class ReverbTestController:
                 }
                 
                 async with session.post(
-                    f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(8000) if not self.is_ssl else '')}/api/pusher/user-auth",
+                    f"{'https' if self.is_ssl else 'http'}://{self.base_url + (':' + str(401) if not self.is_ssl else '')}/api/pusher/user-auth",
                     headers=headers,
                     params=params,
                     ssl=ssl_context if self.is_ssl else None

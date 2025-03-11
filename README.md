@@ -36,13 +36,13 @@ pip install -r requirements.txt
 python -m app.main
 ```
 
-서버는 기본적으로 http://localhost:8000 에서 실행됩니다.
+서버는 기본적으로 http://localhost:401 에서 실행됩니다.
 
 ## API 문서
 
 서버 실행 후 브라우저에서 다음 URL에 접속하여 API 문서를 확인할 수 있습니다:
-- Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc
+- Swagger UI: http://localhost:401/docs
+- ReDoc: http://localhost:401/redoc
 
 ## 웹소켓 서버
 

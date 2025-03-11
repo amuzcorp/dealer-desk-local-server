@@ -155,7 +155,7 @@ async def logout():
         return {"status": "error", "message": error_message}
 
 class UvicornServer:
-    def __init__(self, app, host="0.0.0.0", port=8000):
+    def __init__(self, app, host="0.0.0.0", port=401):
         self.app = app
         self.host = host
         self.port = port
@@ -166,7 +166,7 @@ class UvicornServer:
         await self.server.serve()
 
 async def run_api_server():
-    api_server = UvicornServer(app="main:app", host="0.0.0.0", port=8000)
+    api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
     await api_server.run()
 
 async def run_web_server():
@@ -182,7 +182,7 @@ async def run_all():
     signal.signal(signal.SIGTERM, signal_handler)
     
     print("웹 서버가 3000번 포트에서 실행됩니다.")
-    print("API 서버가 8000번 포트에서 실행됩니다.")
+    print("API 서버가 401번 포트에서 실행됩니다.")
     
     # 웹페이지 띄워주기
     webbrowser.open("http://localhost:3000")

@@ -96403,7 +96403,7 @@ return A.cM(s.fQ(s,new A.acI(a)))},
 A9(){var s=0,r=A.y(t.N),q,p
 var $async$A9=A.z(function(a,b){if(a===1)return A.v(b,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/get-ip-address",0,null)),$async$A9)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/get-ip-address",0,null)),$async$A9)
 case 3:p=b
 if(p.b===200){q=J.Z(B.P.da(0,A.bO(J.Z(A.bN(p.e).c.a,"charset")).aL(0,p.w),null),"ip_address")
 s=1
@@ -98310,7 +98310,7 @@ A.Cc.prototype={
 za(a,b){return this.aFI(a,b)},
 aFI(a,b){var s=0,r=A.y(t.nA),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e,d
 var $async$za=A.z(function(c,a0){if(c===1){o.push(a0)
-s=p}while(true)switch(s){case 0:e="http://localhost:8000/login"
+s=p}while(true)switch(s){case 0:e="http://localhost:401/login"
 p=4
 i=A.bt(e,0,null)
 h=t.N
@@ -98358,7 +98358,7 @@ return A.x($async$za,r)},
 rV(a){return this.a7I(a)},
 a7I(a){var s=0,r=A.y(t.y),q,p=this,o,n,m,l,k,j
 var $async$rV=A.z(function(b,c){if(b===1)return A.v(c,r)
-while(true)switch(s){case 0:m=A.bt("http://localhost:8000/select-store",0,null)
+while(true)switch(s){case 0:m=A.bt("http://localhost:401/select-store",0,null)
 l=t.N
 k=A.ad(["Content-Type","application/json"],l,l)
 s=3
@@ -98398,7 +98398,7 @@ A.jI(k,"/login",t.z)
 q=!0
 s=1
 break}s=7
-return A.u(A.ia(A.bt("http://localhost:8000/logout",0,null),null,null),$async$kr)
+return A.u(A.ia(A.bt("http://localhost:401/logout",0,null),null,null),$async$kr)
 case 7:n=b
 s=n.b===200?8:10
 break
@@ -98451,7 +98451,7 @@ axJ(a,b){var s=0,r=A.y(t.y),q,p,o,n,m
 var $async$xH=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:m=b.bo()
 m.I(0,"id")
-p=A.bt("http://localhost:8000/point/add-point-by-user-id/"+a,0,null)
+p=A.bt("http://localhost:401/point/add-point-by-user-id/"+a,0,null)
 o=t.N
 o=A.ad(["Content-Type","application/json"],o,o)
 s=3
@@ -98468,7 +98468,7 @@ Ad(a){return this.a6Z(a)},
 a6Z(a){var s=0,r=A.y(t.QD),q,p,o,n,m
 var $async$Ad=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/point/get-point-history-by-user-id/"+a,0,null)),$async$Ad)
+return A.u(A.eH(A.bt("http://localhost:401/point/get-point-history-by-user-id/"+a,0,null)),$async$Ad)
 case 3:p=c
 o=p.b
 n=p.e
@@ -98485,7 +98485,7 @@ i9(a){return this.a6n(a)},
 a6n(a){var s=0,r=A.y(t.S),q,p,o,n,m
 var $async$i9=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/point/get-current-point-by-user-id/"+a,0,null)),$async$i9)
+return A.u(A.eH(A.bt("http://localhost:401/point/get-current-point-by-user-id/"+a,0,null)),$async$i9)
 case 3:p=c
 o=p.b
 n=p.e
@@ -98501,7 +98501,7 @@ ib(a){return this.a7d(a)},
 a7d(a){var s=0,r=A.y(t.S),q,p,o,n,m
 var $async$ib=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/point/get-total-point-by-user-id/"+a,0,null)),$async$ib)
+return A.u(A.eH(A.bt("http://localhost:401/point/get-total-point-by-user-id/"+a,0,null)),$async$ib)
 case 3:p=c
 o=p.b
 n=p.e
@@ -98517,7 +98517,7 @@ ms(a){return this.a6u(a)},
 a6u(a){var s=0,r=A.y(t.S),q,p,o,n,m
 var $async$ms=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/point/get-expire-point-by-user-id/"+a,0,null)),$async$ms)
+return A.u(A.eH(A.bt("http://localhost:401/point/get-expire-point-by-user-id/"+a,0,null)),$async$ms)
 case 3:p=c
 o=p.b
 n=p.e
@@ -98536,7 +98536,7 @@ A.R3.prototype={
 kq(){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h,g,f,e
 var $async$kq=A.z(function(a,b){if(a===1){p.push(b)
 s=q}while(true)switch(s){case 0:q=3
-n=A.bt("http://localhost:8000/devices/get-auth-device",0,null)
+n=A.bt("http://localhost:401/devices/get-auth-device",0,null)
 s=6
 return A.u(A.eH(n),$async$kq)
 case 6:m=b
@@ -98582,7 +98582,7 @@ m=h.kk(h,new A.ael(a))
 if(J.e(m,-1)){B.dA.aS(0,"\ub514\ubc14\uc774\uc2a4\ub97c \ucc3e\uc744 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4")
 s=1
 break}l=J.Z(h.gi(0),m).b
-k=A.bt("http://localhost:8000/devices/connect-table",0,null)
+k=A.bt("http://localhost:401/devices/connect-table",0,null)
 h=t.N
 g=A.ad(["Content-Type","application/json"],h,h)
 s=10
@@ -98614,7 +98614,7 @@ return A.x($async$ul,r)},
 yv(a){return this.aBz(a)},
 aBz(a){var s=0,r=A.y(t.H),q=this,p,o,n
 var $async$yv=A.z(function(b,c){if(b===1)return A.v(c,r)
-while(true)switch(s){case 0:p=A.bt("http://localhost:8000/devices/disconnect-table",0,null)
+while(true)switch(s){case 0:p=A.bt("http://localhost:401/devices/disconnect-table",0,null)
 o=t.N
 n=A.ad(["Content-Type","application/json"],o,o)
 s=4
@@ -98628,7 +98628,7 @@ return A.x($async$yv,r)},
 kF(){var s=0,r=A.y(t.EU),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d,c
 var $async$kF=A.z(function(a,b){if(a===1){o.push(b)
 s=p}while(true)switch(s){case 0:p=4
-m=A.bt("http://localhost:8000/devices/get-waiting-device",0,null)
+m=A.bt("http://localhost:401/devices/get-waiting-device",0,null)
 s=7
 return A.u(A.eH(m),$async$kF)
 case 7:l=b
@@ -98683,7 +98683,7 @@ yo(a){return this.aBi(a)},
 aBi(a){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h
 var $async$yo=A.z(function(b,c){if(b===1){p.push(c)
 s=q}while(true)switch(s){case 0:q=3
-n=A.bt("http://localhost:8000/devices/device-delete/"+a,0,null)
+n=A.bt("http://localhost:401/devices/device-delete/"+a,0,null)
 s=6
 return A.u(A.aXj(n),$async$yo)
 case 6:m=c
@@ -98724,7 +98724,7 @@ ua(a){return this.ayy(a)},
 ayy(a){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i
 var $async$ua=A.z(function(b,c){if(b===1){p.push(c)
 s=q}while(true)switch(s){case 0:q=3
-n=A.bt("http://localhost:8000/devices/auth-device",0,null)
+n=A.bt("http://localhost:401/devices/auth-device",0,null)
 k=t.N
 k=A.ad(["Content-Type","application/json"],k,k)
 s=6
@@ -98757,7 +98757,7 @@ if(h.kk(h,new A.aek(a))===-1){A.ct($.G(),"\uc624\ub958","\ub514\ubc14\uc774\uc2a
 q=!1
 s=1
 break}p=4
-m=A.bt("http://localhost:8000/devices/device-name-change",0,null)
+m=A.bt("http://localhost:401/devices/device-name-change",0,null)
 h=t.N
 j=A.ad(["Content-Type","application/json"],h,h)
 s=7
@@ -98881,7 +98881,7 @@ var $async$jK=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:p=A.QK(new A.b8(Date.now(),0,!1).ej(-2592e9),null,0,0)
 o=A.QK(new A.b8(Date.now(),0,!1),null,23,59)
 s=3
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/games/get-period-lookup/?firstdate="+p.fY()+"&lastdate="+o.fY(),0,null)),$async$jK)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/games/get-period-lookup/?firstdate="+p.fY()+"&lastdate="+o.fY(),0,null)),$async$jK)
 case 3:n=d
 m=n.b
 l=n.e
@@ -98897,7 +98897,7 @@ return A.x($async$jK,r)},
 mt(){var s=0,r=A.y(t.vD),q,p,o,n,m,l,k
 var $async$mt=A.z(function(a,b){if(a===1)return A.v(b,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/games/get-first-last-game-start-date/",0,null)),$async$mt)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/games/get-first-last-game-start-date/",0,null)),$async$mt)
 case 3:o=b
 n=o.b
 m=t.If
@@ -98916,7 +98916,7 @@ we(a,b){return this.a8T(a,b)},
 a8T(a,b){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h,g,f
 var $async$we=A.z(function(c,d){if(c===1){p.push(d)
 s=q}while(true)switch(s){case 0:q=3
-j=A.bt("http://127.0.0.1:8000/games/create-game/",0,null)
+j=A.bt("http://127.0.0.1:401/games/create-game/",0,null)
 i=t.N
 h=A.ad(["Content-Type","application/json"],i,i)
 s=6
@@ -98952,7 +98952,7 @@ return A.x($async$we,r)},
 l7(a,b){return this.azH(a,b)},
 azH(a,b){var s=0,r=A.y(t.H),q,p,o,n
 var $async$l7=A.z(function(c,d){if(c===1)return A.v(d,r)
-while(true)switch(s){case 0:q=A.bt("http://127.0.0.1:8000/games/control-game-state",0,null)
+while(true)switch(s){case 0:q=A.bt("http://127.0.0.1:401/games/control-game-state",0,null)
 p=t.N
 o=A.ad(["Content-Type","application/json"],p,p)
 s=2
@@ -98965,7 +98965,7 @@ BR(){var s=0,r=A.y(t.H),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f
 var $async$BR=A.z(function(a,b){if(a===1){o.push(b)
 s=p}while(true)switch(s){case 0:p=4
 s=7
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/games/get-activate-games",0,null)),$async$BR)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/games/get-activate-games",0,null)),$async$BR)
 case 7:m=b
 if(m.b===200){h=m
 l=B.P.da(0,A.bO(J.Z(A.bN(h.e).c.a,"charset")).aL(0,h.w),null)
@@ -98992,7 +98992,7 @@ return A.x($async$BR,r)},
 p9(){var s=0,r=A.y(t.H),q=this,p,o,n,m
 var $async$p9=A.z(function(a,b){if(a===1)return A.v(b,r)
 while(true)switch(s){case 0:s=2
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/games/get-active-game-no-sse-data/",0,null)),$async$p9)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/games/get-active-game-no-sse-data/",0,null)),$async$p9)
 case 2:p=b
 o=p.b
 n=p.e
@@ -99006,7 +99006,7 @@ aBA(a){var s=0,r=A.y(t.H),q,p
 var $async$yw=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:q=t.N
 s=2
-return A.u(A.mr(A.bt("http://127.0.0.1:8000/tables/disconnect-table-game/"+a,0,null),null,A.ad(["Content-Type","application/json"],q,q)),$async$yw)
+return A.u(A.mr(A.bt("http://127.0.0.1:401/tables/disconnect-table-game/"+a,0,null),null,A.ad(["Content-Type","application/json"],q,q)),$async$yw)
 case 2:p=c
 if(p.b!==200)B.bE.aS(0,"Failed to disconnect game: "+A.bO(J.Z(A.bN(p.e).c.a,"charset")).aL(0,p.w))
 return A.w(null,r)}})
@@ -99016,7 +99016,7 @@ aJo(a,b){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h
 var $async$jI=A.z(function(c,d){if(c===1){p.push(d)
 s=q}while(true)switch(s){case 0:i=""+a
 A.a_("updateGameTime: "+i+", "+b)
-n=A.bt("http://127.0.0.1:8000/games/control-game-time/"+i,0,null)
+n=A.bt("http://127.0.0.1:401/games/control-game-time/"+i,0,null)
 q=3
 i=t.N
 k=A.ad(["Content-Type","application/json"],i,i)
@@ -99052,7 +99052,7 @@ var $async$lw=A.z(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
 j=""+a
 s=7
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/games/get-game-by-id/"+j,0,null)),$async$lw)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/games/get-game-by-id/"+j,0,null)),$async$lw)
 case 7:n=c
 if(n.b===200){j=n
 m=J.Z(B.P.da(0,A.bO(J.Z(A.bN(j.e).c.a,"charset")).aL(0,j.w),null),"data")
@@ -99083,7 +99083,7 @@ return A.x($async$lw,r)},
 Gx(a,b){return this.aJn(a,b)},
 aJn(a,b){var s=0,r=A.y(t.H),q,p,o,n
 var $async$Gx=A.z(function(c,d){if(c===1)return A.v(d,r)
-while(true)switch(s){case 0:q=A.bt("http://127.0.0.1:8000/games/update-game-final-prize-by-id/"+a,0,null)
+while(true)switch(s){case 0:q=A.bt("http://127.0.0.1:401/games/update-game-final-prize-by-id/"+a,0,null)
 p=t.N
 o=A.ad(["Content-Type","application/json"],p,p)
 s=2
@@ -99140,7 +99140,7 @@ q=!1
 s=1
 break}A.a_("preset: "+a.a)
 p=4
-m=A.bt("http://127.0.0.1:8000/presets/create-preset",0,null)
+m=A.bt("http://127.0.0.1:401/presets/create-preset",0,null)
 j=t.N
 j=A.ad(["Content-Type","application/json"],j,j)
 s=7
@@ -99176,7 +99176,7 @@ iZ(){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h
 var $async$iZ=A.z(function(a,b){if(a===1){p.push(b)
 s=q}while(true)switch(s){case 0:q=3
 s=6
-return A.u(A.eH(A.bt("http://127.0.0.1:8000/presets/",0,null)),$async$iZ)
+return A.u(A.eH(A.bt("http://127.0.0.1:401/presets/",0,null)),$async$iZ)
 case 6:n=b
 if(n.b===200){j=n
 m=B.P.da(0,A.bO(J.Z(A.bN(j.e).c.a,"charset")).aL(0,j.w),null)
@@ -99203,7 +99203,7 @@ aBj(a){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j
 var $async$yp=A.z(function(b,c){if(b===1){p.push(c)
 s=q}while(true)switch(s){case 0:q=3
 s=6
-return A.u(A.aXj(A.bt("http://127.0.0.1:8000/presets/"+a,0,null)),$async$yp)
+return A.u(A.aXj(A.bt("http://127.0.0.1:401/presets/"+a,0,null)),$async$yp)
 case 6:n=c
 s=n.b===200?7:9
 break
@@ -99231,7 +99231,7 @@ zV(a){return this.aJs(a)},
 aJs(a){var s=0,r=A.y(t.y),q,p=2,o=[],n=this,m,l,k,j,i,h
 var $async$zV=A.z(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
-k=A.bt("http://127.0.0.1:8000/presets/update-preset/"+a.a,0,null)
+k=A.bt("http://127.0.0.1:401/presets/update-preset/"+a.a,0,null)
 j=t.N
 j=A.ad(["Content-Type","application/json"],j,j)
 s=7
@@ -99287,7 +99287,7 @@ n.ay.si(0,!0)
 m=""
 if(a0!=null)m="&status="+A.i(B.b.gaa(a0.M().split(".")))
 s=6
-return A.u(A.eH(A.bt("http://localhost:8000/purchase/get-paginated-purchase-data?page="+a+"&page_size="+b+A.i(m),0,null)),$async$nR)
+return A.u(A.eH(A.bt("http://localhost:401/purchase/get-paginated-purchase-data?page="+a+"&page_size="+b+A.i(m),0,null)),$async$nR)
 case 6:l=a2
 if(l.b===200){g=l
 k=B.P.da(0,A.bO(J.Z(A.bN(g.e).c.a,"charset")).aL(0,g.w),null)
@@ -99338,7 +99338,7 @@ var $async$zU=A.z(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
 i=""+a
 s=7
-return A.u(A.eH(A.bt("http://localhost:8000/purchase/waiting-to-payment-chip/"+i,0,null)),$async$zU)
+return A.u(A.eH(A.bt("http://localhost:401/purchase/waiting-to-payment-chip/"+i,0,null)),$async$zU)
 case 7:m=c
 if(m.b===200){i=n.at
 l=i.dn(i,new A.avz(a))
@@ -99382,7 +99382,7 @@ var $async$zT=A.z(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
 j=""+a
 s=7
-return A.u(A.eH(A.bt("http://localhost:8000/purchase/chip-waiting-to-success/"+j,0,null)),$async$zT)
+return A.u(A.eH(A.bt("http://localhost:401/purchase/chip-waiting-to-success/"+j,0,null)),$async$zT)
 case 7:m=c
 if(m.b===200){q=!0
 s=1
@@ -99416,7 +99416,7 @@ vQ(a){return this.a6S(a)},
 a6S(a){var s=0,r=A.y(t.VO),q,p,o,n,m
 var $async$vQ=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/purchase/get-purchase-data-by-user-id/"+a,0,null)),$async$vQ)
+return A.u(A.eH(A.bt("http://localhost:401/purchase/get-purchase-data-by-user-id/"+a,0,null)),$async$vQ)
 case 3:m=c
 if(m.b===200){p=m.e
 o=A.bO(J.Z(A.bN(p).c.a,"charset"))
@@ -99435,7 +99435,7 @@ a6Q(a,b){var s=0,r=A.y(t.VO),q,p=2,o=[],n,m,l,k,j,i,h,g,f,e
 var $async$pH=A.z(function(c,d){if(c===1){o.push(d)
 s=p}while(true)switch(s){case 0:p=4
 s=7
-return A.u(A.eH(A.bt("http://localhost:8000/purchase/get-purchase-data-by-date/"+a.fY()+"/"+b.fY(),0,null)),$async$pH)
+return A.u(A.eH(A.bt("http://localhost:401/purchase/get-purchase-data-by-date/"+a.fY()+"/"+b.fY(),0,null)),$async$pH)
 case 7:n=d
 if(n.b===200){h=n
 m=B.P.da(0,A.bO(J.Z(A.bN(h.e).c.a,"charset")).aL(0,h.w),null)
@@ -99473,7 +99473,7 @@ vP(a){return this.a6R(a)},
 a6R(a){var s=0,r=A.y(t.VO),q,p,o,n
 var $async$vP=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/purchase/get-purchase-data-by-game-id/"+a,0,null)),$async$vP)
+return A.u(A.eH(A.bt("http://localhost:401/purchase/get-purchase-data-by-game-id/"+a,0,null)),$async$vP)
 case 3:n=c
 if(n.b===200){p=B.P.da(0,A.bO(J.Z(A.bN(n.e).c.a,"charset")).aL(0,n.w),null)
 o=J.aE(p)
@@ -99491,7 +99491,7 @@ yd(a,b){return this.aAE(a,b)},
 aAE(a,b){var s=0,r=A.y(t.H)
 var $async$yd=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:s=2
-return A.u(A.mr(A.bt("http://localhost:8000/purchase/create-buyin-purchase-data-by-user-id/?user_id="+a+"&game_id="+b,0,null),null,null),$async$yd)
+return A.u(A.mr(A.bt("http://localhost:401/purchase/create-buyin-purchase-data-by-user-id/?user_id="+a+"&game_id="+b,0,null),null,null),$async$yd)
 case 2:return A.w(null,r)}})
 return A.x($async$yd,r)}}
 A.avy.prototype={
@@ -99870,7 +99870,7 @@ Ap(a){return this.a7r(a)},
 a7r(a){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h,g,f,e
 var $async$Ap=A.z(function(b,c){if(b===1){p.push(c)
 s=q}while(true)switch(s){case 0:q=3
-n=A.bt("http://127.0.0.1:8000/tables/save-table",0,null)
+n=A.bt("http://127.0.0.1:401/tables/save-table",0,null)
 g=a.$ti.h("a2<M.E,aR<j,@>>")
 m=B.P.fD(A.U(new A.a2(a,new A.aDq(),g),!0,g.h("al.E")),null)
 g=t.N
@@ -99905,7 +99905,7 @@ return A.x($async$Ap,r)},
 eQ(){var s=0,r=A.y(t.rN),q,p=2,o=[],n=this,m,l,k,j,i,h,g,f,e,d
 var $async$eQ=A.z(function(a,b){if(a===1){o.push(b)
 s=p}while(true)switch(s){case 0:p=4
-m=A.bt("http://localhost:8000/tables/",0,null)
+m=A.bt("http://localhost:401/tables/",0,null)
 s=7
 return A.u(A.eH(m),$async$eQ)
 case 7:l=b
@@ -99947,7 +99947,7 @@ l6(a,b){return this.azA(a,b)},
 azA(a,b){var s=0,r=A.y(t.H),q=1,p=[],o=this,n,m,l,k,j,i,h
 var $async$l6=A.z(function(c,d){if(c===1){p.push(d)
 s=q}while(true)switch(s){case 0:q=3
-n=A.bt("http://localhost:8000/tables/connect-table-game-id/",0,null)
+n=A.bt("http://localhost:401/tables/connect-table-game-id/",0,null)
 k=t.N
 j=A.ad(["Content-Type","application/json"],k,k)
 s=6
@@ -100040,7 +100040,7 @@ n0(a){return this.aAB(a)},
 aAB(a){var s=0,r=A.y(t.y),q,p=2,o=[],n,m,l,k,j,i,h
 var $async$n0=A.z(function(b,c){if(b===1){o.push(c)
 s=p}while(true)switch(s){case 0:p=4
-k=A.bt("http://localhost:8000/awarding/create-awarding-history",0,null)
+k=A.bt("http://localhost:401/awarding/create-awarding-history",0,null)
 j=t.N
 j=A.ad(["Content-Type","application/json"],j,j)
 s=7
@@ -100074,7 +100074,7 @@ mp(a){return this.a6c(a)},
 a6c(a){var s=0,r=A.y(t.Td),q,p,o
 var $async$mp=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/awarding/get-awarding-history-by-user-id/"+a,0,null)),$async$mp)
+return A.u(A.eH(A.bt("http://localhost:401/awarding/get-awarding-history-by-user-id/"+a,0,null)),$async$mp)
 case 3:o=c
 if(o.b===200){p=J.d8(t.j.a(J.Z(B.P.da(0,A.bO(J.Z(A.bN(o.e).c.a,"charset")).aL(0,o.w),null),"data")),new A.aF9(),t.gK)
 q=A.U(p,!0,p.$ti.h("al.E"))
@@ -100088,7 +100088,7 @@ vH(a){return this.a6a(a)},
 a6a(a){var s=0,r=A.y(t.Td),q,p,o
 var $async$vH=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/awarding/get-awarding-history-by-game-id/"+a,0,null)),$async$vH)
+return A.u(A.eH(A.bt("http://localhost:401/awarding/get-awarding-history-by-game-id/"+a,0,null)),$async$vH)
 case 3:o=c
 if(o.b===200){p=J.d8(t.j.a(J.Z(B.P.da(0,A.bO(J.Z(A.bN(o.e).c.a,"charset")).aL(0,o.w),null),"data")),new A.aF8(),t.gK)
 q=A.U(p,!0,p.$ti.h("al.E"))
@@ -100405,7 +100405,7 @@ A.YP.prototype={
 ly(){var s=0,r=A.y(t.XB),q,p,o,n,m,l
 var $async$ly=A.z(function(a,b){if(a===1)return A.v(b,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/users/get-user-list",0,null)),$async$ly)
+return A.u(A.eH(A.bt("http://localhost:401/users/get-user-list",0,null)),$async$ly)
 case 3:o=b
 n=o.e
 m=A.bO(J.Z(A.bN(n).c.a,"charset"))
@@ -100423,7 +100423,7 @@ return A.x($async$ly,r)},
 lv(){var s=0,r=A.y(t.XB),q,p,o,n,m
 var $async$lv=A.z(function(a,b){if(a===1)return A.v(b,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/users/get-all-user-list",0,null)),$async$lv)
+return A.u(A.eH(A.bt("http://localhost:401/users/get-all-user-list",0,null)),$async$lv)
 case 3:m=b
 if(m.b===200){p=B.P.da(0,A.bO(J.Z(A.bN(m.e).c.a,"charset")).aL(0,m.w),null)
 A.a_(p)
@@ -100441,7 +100441,7 @@ a7s(a){var s=0,r=A.y(t.H),q,p,o
 var $async$w_=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/update-user-data",0,null),B.P.fD(a.bo(),null),A.ad(["Content-Type","application/json"],p,p)),$async$w_)
+return A.u(A.mr(A.bt("http://localhost:401/users/update-user-data",0,null),B.P.fD(a.bo(),null),A.ad(["Content-Type","application/json"],p,p)),$async$w_)
 case 3:o=c
 if(o.b===200){A.bO(J.Z(A.bN(o.e).c.a,"charset")).aL(0,o.w)
 s=1
@@ -100452,7 +100452,7 @@ lU(a){return this.aAI(a)},
 aAI(a){var s=0,r=A.y(t.Is),q,p=this,o,n,m
 var $async$lU=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/create-guest-user/"+a,0,null),null,null),$async$lU)
+return A.u(A.mr(A.bt("http://localhost:401/users/create-guest-user/"+a,0,null),null,null),$async$lU)
 case 3:m=c
 s=m.b===200?4:6
 break
@@ -100473,7 +100473,7 @@ kD(a){return this.a6E(a)},
 a6E(a){var s=0,r=A.y(t.XB),q,p,o,n
 var $async$kD=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:s=3
-return A.u(A.eH(A.bt("http://localhost:8000/users/in-game-user-list/"+a,0,null)),$async$kD)
+return A.u(A.eH(A.bt("http://localhost:401/users/in-game-user-list/"+a,0,null)),$async$kD)
 case 3:n=c
 if(n.b===200){p=t.j.a(J.Z(B.P.da(0,A.bO(J.Z(A.bN(n.e).c.a,"charset")).aL(0,n.w),null),"data"))
 o=J.aE(p)
@@ -100489,7 +100489,7 @@ aJ8(a,b,c){var s=0,r=A.y(t.y),q,p,o
 var $async$nI=A.z(function(d,e){if(d===1)return A.v(e,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/update-user-in-game-sit-status/?game_id="+b+"&user_id="+a+"&is_sit="+c,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$nI)
+return A.u(A.mr(A.bt("http://localhost:401/users/update-user-in-game-sit-status/?game_id="+b+"&user_id="+a+"&is_sit="+c,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$nI)
 case 3:o=e
 if(o.b===200){A.bO(J.Z(A.bN(o.e).c.a,"charset")).aL(0,o.w)
 q=!0
@@ -100503,7 +100503,7 @@ ay1(a,b){var s=0,r=A.y(t.y),q,p
 var $async$kZ=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/update-user-in-game-join-count/?game_id="+b+"&user_id="+a,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$kZ)
+return A.u(A.mr(A.bt("http://localhost:401/users/update-user-in-game-join-count/?game_id="+b+"&user_id="+a,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$kZ)
 case 3:if(d.b===200){q=!0
 s=1
 break}else{q=!1
@@ -100515,7 +100515,7 @@ axN(a,b){var s=0,r=A.y(t.y),q,p
 var $async$mN=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/update-user-rebuy-in/?game_id="+b+"&user_id="+a,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$mN)
+return A.u(A.mr(A.bt("http://localhost:401/users/update-user-rebuy-in/?game_id="+b+"&user_id="+a,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$mN)
 case 3:if(d.b===200){q=!0
 s=1
 break}else{q=!1
@@ -100527,7 +100527,7 @@ axP(a,b){var s=0,r=A.y(t.y),q,p
 var $async$lP=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/update-user-rebuy-in-order/?game_id="+b+"&user_id="+a,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$lP)
+return A.u(A.mr(A.bt("http://localhost:401/users/update-user-rebuy-in-order/?game_id="+b+"&user_id="+a,0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$lP)
 case 3:if(d.b===200){q=!0
 s=1
 break}else{q=!1
@@ -100539,7 +100539,7 @@ axr(a,b){var s=0,r=A.y(t.y),q,p
 var $async$mL=A.z(function(c,d){if(c===1)return A.v(d,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.mr(A.bt("http://localhost:8000/users/update-user-in-game-addon/?game_id="+b+"&user_id="+a+"&is_addon=true",0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$mL)
+return A.u(A.mr(A.bt("http://localhost:401/users/update-user-in-game-addon/?game_id="+b+"&user_id="+a+"&is_addon=true",0,null),null,A.ad(["Content-Type","application/json"],p,p)),$async$mL)
 case 3:if(d.b===200){q=!0
 s=1
 break}else{q=!1
@@ -100551,7 +100551,7 @@ aAV(a){var s=0,r=A.y(t.H),q,p
 var $async$n1=A.z(function(b,c){if(b===1)return A.v(c,r)
 while(true)switch(s){case 0:p=t.N
 s=3
-return A.u(A.ia(A.bt("http://localhost:8000/users/create-user",0,null),B.P.fD(a.bo(),null),A.ad(["Content-Type","application/json"],p,p)),$async$n1)
+return A.u(A.ia(A.bt("http://localhost:401/users/create-user",0,null),B.P.fD(a.bo(),null),A.ad(["Content-Type","application/json"],p,p)),$async$n1)
 case 3:if(c.b===200){s=1
 break}else throw A.f(A.ck("Failed to create user"))
 case 1:return A.w(q,r)}})
