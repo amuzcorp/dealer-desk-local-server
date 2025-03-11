@@ -1,232 +1,103 @@
 import os
-import sys
-import shutil
 import subprocess
+import sys
 from pathlib import Path
-import argparse
-import site
-import glob
 
-def build_windows_app(one_file=False, console=False, icon_path=None):
-    """
-    PyInstaller를 사용하여 윈도우 애플리케이션을 빌드합니다.
+def main():
+    """윈도우용 실행 파일 빌드 스크립트"""
+    print("딜러 데스크 로컬 서버 윈도우용 빌드를 시작합니다...")
     
-    Args:
-        one_file (bool): 단일 파일로 빌드할지 여부
-        console (bool): 콘솔 창을 표시할지 여부
-        icon_path (str): 아이콘 파일 경로
-    """
-    print("딜러 데스크 서버 윈도우 애플리케이션 빌드를 시작합니다...")
+    # 현재 디렉토리 저장
+    current_dir = os.getcwd()
     
-    # 현재 디렉토리
-    current_dir = Path.cwd()
-    
-    # 빌드 디렉토리 생성
-    build_dir = current_dir / "build"
-    dist_dir = current_dir / "dist"
-    
-    # 기존 빌드 디렉토리 정리
-    if build_dir.exists():
-        print("기존 build 디렉토리를 정리합니다...")
-        shutil.rmtree(build_dir)
-    
-    if dist_dir.exists():
-        print("기존 dist 디렉토리를 정리합니다...")
-        shutil.rmtree(dist_dir)
-    
-    # Python 버전 확인
-    python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
-    python_dll = f"python{python_version.replace('.', '')}.dll"
-    
-    # Python DLL 파일 찾기
-    python_dll_paths = []
-    
-    # 1. Python 설치 디렉토리에서 찾기
-    python_dir_dll = os.path.join(sys.prefix, python_dll)
-    if os.path.exists(python_dir_dll):
-        python_dll_paths.append(python_dir_dll)
-        print(f"Python 설치 디렉토리에서 DLL 파일 발견: {python_dir_dll}")
-    
-    # 2. Python 실행 파일 디렉토리에서 찾기
-    python_exe_dir = os.path.dirname(sys.executable)
-    python_exe_dll = os.path.join(python_exe_dir, python_dll)
-    if os.path.exists(python_exe_dll) and python_exe_dll not in python_dll_paths:
-        python_dll_paths.append(python_exe_dll)
-        print(f"Python 실행 파일 디렉토리에서 DLL 파일 발견: {python_exe_dll}")
-    
-    # 3. 시스템 경로에서 찾기
-    for path in os.environ["PATH"].split(os.pathsep):
-        dll_path = os.path.join(path, python_dll)
-        if os.path.exists(dll_path) and dll_path not in python_dll_paths:
-            python_dll_paths.append(dll_path)
-            print(f"시스템 경로에서 DLL 파일 발견: {dll_path}")
-    
-    # 관련 DLL 파일 찾기
-    related_dlls = ["vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"]
-    related_dll_paths = []
-    
-    for related_dll in related_dlls:
-        # Python 설치 디렉토리에서 찾기
-        dll_path = os.path.join(sys.prefix, related_dll)
-        if os.path.exists(dll_path) and dll_path not in related_dll_paths:
-            related_dll_paths.append(dll_path)
-            print(f"관련 DLL 파일 발견: {dll_path}")
+    try:
+        # 아이콘 파일 생성
+        create_icon()
         
-        # Python 실행 파일 디렉토리에서 찾기
-        dll_path = os.path.join(python_exe_dir, related_dll)
-        if os.path.exists(dll_path) and dll_path not in related_dll_paths:
-            related_dll_paths.append(dll_path)
-            print(f"관련 DLL 파일 발견: {dll_path}")
-    
-    # 사이트 패키지 디렉토리 찾기
-    site_packages = site.getsitepackages()
-    print(f"사이트 패키지 디렉토리: {site_packages}")
-    
-    # 기본 명령어 구성
-    cmd = [
-        "pyinstaller",
-        "--clean",
-        "--name", "DealerDeskServer",
-        "--add-data", f"main.py{os.pathsep}.",
-        "--collect-all", "uvicorn",
-        "--collect-all", "fastapi",
-        "--collect-all", "starlette",
-        "--collect-all", "pydantic",
-        "--collect-all", "sqlalchemy",
-        "--collect-all", "pystray",
-        "--collect-all", "PIL",
-    ]
-    
-    # 아이콘 추가
-    if icon_path and os.path.exists(icon_path):
-        cmd.extend(["--icon", icon_path])
-    
-    # 단일 파일 옵션
-    if one_file:
-        cmd.append("--onefile")
-    else:
-        cmd.append("--onedir")
-    
-    # 콘솔 창 표시 여부
-    if not console:
-        cmd.append("--noconsole")
-    
-    # Python DLL 포함 설정
-    cmd.append("--copy-metadata=sqlalchemy")
-    cmd.append("--copy-metadata=pydantic")
-    cmd.append("--copy-metadata=fastapi")
-    cmd.append("--copy-metadata=starlette")
-    
-    # 추가 파일 및 모듈 포함
-    cmd.extend([
-        "--hidden-import", "uvicorn.logging",
-        "--hidden-import", "uvicorn.lifespan",
-        "--hidden-import", "uvicorn.lifespan.on",
-        "--hidden-import", "uvicorn.lifespan.off",
-        "--hidden-import", "uvicorn.protocols",
-        "--hidden-import", "uvicorn.protocols.http",
-        "--hidden-import", "uvicorn.protocols.http.auto",
-        "--hidden-import", "uvicorn.protocols.websockets",
-        "--hidden-import", "uvicorn.protocols.websockets.auto",
-        "--hidden-import", "uvicorn.protocols.websockets.websockets_impl",
-        "--hidden-import", "uvicorn.protocols.websockets.wsproto_impl",
-        "--hidden-import", "fastapi",
-        "--hidden-import", "sqlalchemy",
-        "--hidden-import", "pydantic",
-        "--hidden-import", "PIL",
-        "--hidden-import", "PIL._tkinter_finder",
-        "--hidden-import", "PIL.Image",
-        "--hidden-import", "PIL.ImageDraw",
-        "--hidden-import", "pystray._win32",
-        "--hidden-import", "win32api",
-        "--hidden-import", "win32con",
-        "--hidden-import", "win32gui",
-    ])
-    
-    # Python DLL 파일 추가
-    for dll_path in python_dll_paths:
-        cmd.extend(["--add-binary", f"{dll_path}{os.pathsep}."])
-    
-    # 관련 DLL 파일 추가
-    for dll_path in related_dll_paths:
-        cmd.extend(["--add-binary", f"{dll_path}{os.pathsep}."])
-    
-    # 메인 스크립트 지정
-    cmd.append("win_tray_app.py")
-    
-    # 명령어 실행
-    print(f"실행 명령어: {' '.join(cmd)}")
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    # 결과 출력
-    if result.returncode == 0:
-        print("빌드 성공!")
-        print(f"실행 파일 위치: {dist_dir / 'DealerDeskServer'}")
+        # PyInstaller 옵션 설정
+        pyinstaller_args = [
+            "pyinstaller",
+            "--name=DealerDeskServer",
+            "--onefile",  # 단일 파일로 빌드
+            "--windowed",  # 콘솔 창 없이 실행
+            "--icon=dealer_desk_icon.ico",  # 아이콘 설정
+            "--add-data=static;static",  # 정적 파일 포함
+            "--add-data=templates;templates",  # 템플릿 파일 포함
+            "--hidden-import=uvicorn.logging",
+            "--hidden-import=uvicorn.lifespan",
+            "--hidden-import=uvicorn.lifespan.on",
+            "--hidden-import=uvicorn.lifespan.off",
+            "app_tray.py"  # 메인 스크립트
+        ]
         
-        # 추가 파일 복사
-        try:
-            # 필요한 디렉토리 복사
-            dirs_to_copy = ["Controllers", "templates", "static"]
-            for dir_name in dirs_to_copy:
-                src_dir = current_dir / dir_name
-                if src_dir.exists():
-                    dst_dir = dist_dir / "DealerDeskServer" / dir_name
-                    if not one_file:
-                        if dst_dir.exists():
-                            shutil.rmtree(dst_dir)
-                        shutil.copytree(src_dir, dst_dir)
-                    else:
-                        os.makedirs(dist_dir / dir_name, exist_ok=True)
-                        shutil.copytree(src_dir, dist_dir / dir_name)
+        # 요구 사항 파일이 있으면 추가
+        if os.path.exists("requirements.txt"):
+            pyinstaller_args.insert(1, "--collect-all=fastapi")
+            pyinstaller_args.insert(1, "--collect-all=sqlalchemy")
             
-            # Python DLL 파일 직접 복사 (추가 보장)
-            if not one_file:
-                # Python DLL 파일 복사
-                for dll_path in python_dll_paths:
-                    if os.path.exists(dll_path):
-                        dll_name = os.path.basename(dll_path)
-                        dst_dll_path = dist_dir / "DealerDeskServer" / dll_name
-                        shutil.copy2(dll_path, dst_dll_path)
-                        print(f"Python DLL 파일 복사됨: {dll_path} -> {dst_dll_path}")
-                
-                # 관련 DLL 파일 복사
-                for dll_path in related_dll_paths:
-                    if os.path.exists(dll_path):
-                        dll_name = os.path.basename(dll_path)
-                        dst_dll_path = dist_dir / "DealerDeskServer" / dll_name
-                        shutil.copy2(dll_path, dst_dll_path)
-                        print(f"관련 DLL 파일 복사됨: {dll_path} -> {dst_dll_path}")
-                
-                # PyWin32 DLL 파일 복사
-                pywin32_dlls = ["pythoncom*.dll", "pywintypes*.dll"]
-                for pattern in pywin32_dlls:
-                    for site_pkg in site_packages:
-                        for dll_path in glob.glob(os.path.join(site_pkg, pattern)):
-                            if os.path.exists(dll_path):
-                                dll_name = os.path.basename(dll_path)
-                                dst_dll_path = dist_dir / "DealerDeskServer" / dll_name
-                                shutil.copy2(dll_path, dst_dll_path)
-                                print(f"PyWin32 DLL 파일 복사됨: {dll_path} -> {dst_dll_path}")
+        # PyInstaller 실행
+        print("PyInstaller 실행 중...")
+        print(" ".join(pyinstaller_args))
+        subprocess.run(pyinstaller_args, check=True)
+        
+        # 빌드 성공 메시지
+        print("\n=== 빌드 완료 ===")
+        print(f"실행 파일 위치: {os.path.join(current_dir, 'dist', 'DealerDeskServer.exe')}")
+        print("이 파일을 실행하면 시스템 트레이에 딜러 데스크 서버가 실행됩니다.")
+        
+    except Exception as e:
+        print(f"빌드 중 오류 발생: {e}")
+        return 1
+    finally:
+        # 원래 디렉토리로 복귀
+        os.chdir(current_dir)
+    
+    return 0
+
+def create_icon():
+    """아이콘 파일 생성"""
+    try:
+        from PIL import Image, ImageDraw
+        
+        # 아이콘이 이미 있으면 건너뜀
+        if os.path.exists("dealer_desk_icon.ico"):
+            print("아이콘 파일이 이미 존재합니다.")
+            return
+        
+        print("아이콘 파일 생성 중...")
+        
+        # 아이콘 크기
+        sizes = [(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
+        icons = []
+        
+        for size in sizes:
+            width, height = size
             
-            print("필요한 파일 복사 완료")
-        except Exception as e:
-            print(f"파일 복사 중 오류 발생: {e}")
-    else:
-        print("빌드 실패!")
-        print("오류 메시지:")
-        print(result.stdout)
-        print(result.stderr)
+            # 이미지 생성
+            image = Image.new('RGBA', (width, height), color=(0, 0, 0, 0))
+            dc = ImageDraw.Draw(image)
+            
+            # 딜러 데스크 아이콘 - 단순한 카드 테이블 형태로 그림
+            margin = width // 6
+            dc.rectangle((margin, margin, width-margin, height-margin), fill='green', outline='white', width=max(1, width//32))
+            dc.ellipse((margin+2, margin+2, width-margin-2, height-margin-2), outline='white', width=max(1, width//32))
+            
+            icons.append(image)
+        
+        # ICO 파일로 저장
+        icons[0].save(
+            "dealer_desk_icon.ico", 
+            format="ICO", 
+            sizes=[(i.width, i.height) for i in icons],
+            append_images=icons[1:]
+        )
+        
+        print("아이콘 파일 생성 완료.")
+        
+    except ImportError:
+        print("PIL 라이브러리가 필요합니다. pip install pillow 명령으로 설치하세요.")
+    except Exception as e:
+        print(f"아이콘 생성 중 오류 발생: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="딜러 데스크 서버 윈도우 애플리케이션 빌드")
-    parser.add_argument("--onefile", action="store_true", help="단일 파일로 빌드")
-    parser.add_argument("--console", action="store_true", help="콘솔 창 표시")
-    parser.add_argument("--icon", type=str, help="아이콘 파일 경로")
-    
-    args = parser.parse_args()
-    
-    build_windows_app(
-        one_file=args.onefile,
-        console=args.console,
-        icon_path=args.icon
-    ) 
+    sys.exit(main()) 

@@ -116,9 +116,9 @@ class ReverbTestController:
         self.bearer_token = ""
         self.channel_name = "private-admin_penal."
         self.is_ssl = True
-        self.base_url = "dealer-desk.dev.amuz.kr"
+        self.base_url = "dealerdesk.app"
         self.store_host_name = ""
-        self.server_url = f"{'wss' if self.is_ssl else 'ws'}://{self.base_url}/app/hyx4ylczjr3sndkwqx8u"
+        self.server_url = f"{'wss' if self.is_ssl else 'ws'}://{self.base_url}/app/ppmd6xutwslgmbmyp88r"
         self.auth_event = asyncio.Event()
         self.queue_manager = MessageQueueManager()
         self.auth_manager = AuthManager()
@@ -507,6 +507,7 @@ class ReverbTestController:
                         try:
                             # 가입 데이터를 데이터베이스에 저장
                             customer_model = models.UserData(
+                                id=customer_data['id'],
                                 name=customer_data['name'],
                                 phone_number=customer_data['phone_number'],
                                 email=customer_data['email'],
