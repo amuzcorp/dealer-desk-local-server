@@ -210,7 +210,8 @@ class ReverbTestController:
                     # gzip으로 압축되어 있는지 확인
                     if response.headers.get('Content-Encoding') == 'gzip':
                         logger.info('gzip으로 압축된 응답을 받았습니다')
-                        data = await response.json()
+                    data = await response.json()
+                    print(f"data : {data}")
                     if data:
                         # 성공적인 온라인 인증 시 데이터 저장
                         self.bearer_token = data['token']

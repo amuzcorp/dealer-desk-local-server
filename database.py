@@ -45,7 +45,7 @@ class DatabaseManager:
     def __init__(self):
         self.engines = {}
         self.session_makers = {}
-        self.db_directory = "./databases"
+        self.db_directory = os.path.join(os.path.expanduser("~/.dealer_desk"), ".databases")  # 윈도우 호환성을 위해 경로 수정
         
         # 데이터베이스 디렉토리가 없으면 생성
         if not os.path.exists(self.db_directory):

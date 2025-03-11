@@ -1,4 +1,6 @@
 import asyncio
+import webbrowser
+import uvicorn
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -7,26 +9,19 @@ import models, schemas, database
 import dataclasses
 import socket
 from Controllers import game_controller, purchase_controller, qr_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller, point_controller
-
-# 데이터베이스 테이블 생성은 매장별로 처리되므로 여기서는 제거
-# models.Base.metadata.create_all(bind=database.engine)
-
-# 테스트 구매 데이터 생성
-# database.create_test_purchase_data()
-
-# # 임의 플레이어 데이터 추가
-# database.add_player_data()
+import sys
+import signal
 
 app = FastAPI(
-    title="FastAPI Project",
-    description="FastAPI 프로젝트 기본 설정",
+    title="Dealer Desk API Server",
+    description="딜러 데스크 API 서버",
     version="1.0.0"
 )
 
 # CORS 미들웨어 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 실제 운영 환경에서는 구체적인 도메인을 지정해야 합니다
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,10 +41,6 @@ app.include_router(awarding_controller.router)
 app.include_router(point_controller.router)
 app.include_router(qr_controller.router)
 socket_controller: ReverbTestController = ReverbTestController()
-
-@app.get("/")
-async def root():
-    return {"message": "FastAPI 서버가 실행중입니다!"}
 
 @app.get("/health")
 async def health_check():
@@ -163,13 +154,43 @@ async def logout():
         print(f"로그아웃 처리 중 오류 발생: {error_message}")
         return {"status": "error", "message": error_message}
 
+class UvicornServer:
+    def __init__(self, app, host="0.0.0.0", port=8000):
+        self.app = app
+        self.host = host
+        self.port = port
+        self.config = uvicorn.Config(app, host=host, port=port, reload=True)
+        self.server = uvicorn.Server(config=self.config)
+    
+    async def run(self):
+        await self.server.serve()
+
+async def run_api_server():
+    api_server = UvicornServer(app="main:app", host="0.0.0.0", port=8000)
+    await api_server.run()
+
+async def run_web_server():
+    web_server = UvicornServer(app="web_server:app", host="0.0.0.0", port=3000)
+    await web_server.run()
+
+async def run_all():
+    # 시그널 핸들러 설정
+    def signal_handler(signum, frame):
+        print("\n서버를 종료합니다...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    print("웹 서버가 3000번 포트에서 실행됩니다.")
+    print("API 서버가 8000번 포트에서 실행됩니다.")
+    
+    # 웹페이지 띄워주기
+    webbrowser.open("http://localhost:3000")
+    
+    await asyncio.gather(
+        run_api_server(),
+        run_web_server()
+    )
+
 if __name__ == "__main__":
-    import uvicorn
-    
-    # # FastAPI 이벤트에서 소켓 초기화가 처리되므로 여기서는 필요 없음
-    # # 하지만 FastAPI 이벤트 전에 실행하고 싶다면 아래와 같이 실행할 수 있음
-    # asyncio.run(startup_event())
-    
-    print("소켓 컨트롤러가 null인가? : ", socket_controller is None)
-    # FastAPI 서버 실행
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    asyncio.run(run_all())

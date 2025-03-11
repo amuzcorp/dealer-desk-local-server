@@ -151,9 +151,9 @@ async def create_user(user_data: schemas.UserDataCreate):
             phone_number=user_data.phone_number,
             email=user_data.email,
             game_join_count=user_data.game_join_count,
-            visit_count=user_data.visit_count,
-            register_at=user_data.register_at,
-            last_visit_at=user_data.last_visit_at,
+            visit_count=1,
+            register_at=datetime.now(),
+            last_visit_at=datetime.now(),
             remark=user_data.remark,
         )
         
@@ -163,9 +163,13 @@ async def create_user(user_data: schemas.UserDataCreate):
         
         user_json = user.to_json()
         
-        # 시간 포맷 변환
-        user_json["register_at"] = user_json["register_at"].isoformat()
-        user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+        # # 시간 포맷 변환
+        # user_json["register_at"] = user_json["register_at"].isoformat()
+        # user_json["last_visit_at"] = user_json["last_visit_at"].isoformat()
+        
+        import main
+        print("user created")
+        await main.socket_controller.register_customer_data(user)
         
         return JSONResponse(
             content={"response": 200, "message": "사용자가 생성되었습니다", "data": user_json},
@@ -447,6 +451,84 @@ async def in_game_user_list(game_id: str):
     finally:
         db.close()
 
+@router.get("/update-user-in-game-sit-status")
+async def update_user_in_game_sit_status(game_id: int, user_id: int, is_sit: bool):
+    """게임 참가자의 착석 상태를 업데이트합니다."""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 게임 조회
+        game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+        if not game:
+            return JSONResponse(
+                content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 사용자 조회
+        user = db.query(models.UserData).filter(models.UserData.id == user_id).first()
+        if not user:
+            return JSONResponse(
+                content={"response": 404, "message": "사용자를 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+            
+        # 게임 참가자 목록
+        game_in_player = game.game_in_player.copy() if game.game_in_player else []
+        
+        # 참가자 목록에서 해당 사용자 찾기
+        user_found = False
+        for player in game_in_player:
+            if player.get("customer_id") == user_id:
+                player["is_sit"] = is_sit
+                user_found = True
+                break
+                
+        # 참가자 목록에 사용자가 없으면 추가
+        if not user_found:
+            game_in_player.append({
+                "customer_id": user_id,
+                "join_count": 0,
+                "is_sit": is_sit,
+                "is_addon": False
+            })
+            
+        # 게임 참가자 목록 업데이트
+        game.game_in_player = game_in_player
+        
+        db.query(models.GameData).filter(models.GameData.id == game_id).update(
+            {"game_in_player": game_in_player}
+        )
+        
+        db.commit()
+        
+        import main
+        await main.socket_controller.update_game_data(game)
+        
+        # 관련 디바이스에게 변경 알림
+        table_datas : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        for table_data in table_datas:
+            table_connect_devices : List[models.AuthDeviceData] = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
+            for table_connect_device in table_connect_devices:
+                for device_socket in devices_sockets.values():
+                    if device_socket.device_uid == table_connect_device.device_uid:
+                        print(f"device_socket.device_uid : {device_socket.device_uid}")
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
+        
+        return JSONResponse(
+            content={"response": 200, "message": "착석 상태가 업데이트되었습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+
 @router.put("/update-user-in-game-sit-status")
 async def update_user_in_game_sit_status(game_id: int, user_id: int, is_sit: bool):
     """게임 참가자의 착석 상태를 업데이트합니다."""
@@ -526,6 +608,71 @@ async def update_user_in_game_sit_status(game_id: int, user_id: int, is_sit: boo
         db.close()
 
 @router.put("/update-user-in-game-join-count")
+async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase: bool = False):
+    """
+    사용자의 게임 참여 횟수를 업데이트합니다.
+    """
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 게임 조회
+        game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
+        if not game:
+            return JSONResponse(
+                content={"response": 404, "message": "게임을 찾을 수 없습니다"},
+                headers={"Content-Type": "application/json; charset=utf-8"}
+            )
+        
+        # 게임 참여자 목록 업데이트
+        game_in_player = game.game_in_player.copy() if game.game_in_player else []
+        is_found = False
+        
+        for player in game_in_player:
+            if player.get("customer_id") == user_id:
+                player["join_count"] += 1
+                is_found = True
+                
+        if not is_found:
+            add_in_game_user = InGameUser(customer_id=user_id, join_count=1, is_sit=True, is_addon=False).to_json()
+            game_in_player.append(add_in_game_user)
+                
+        # 변경사항 저장
+        db.query(models.GameData).filter(models.GameData.id == game_id).update(
+            {"game_in_player": game_in_player}
+        )
+        
+        db.commit()
+        db.refresh(game)
+        
+        import main
+        await main.socket_controller.update_game_data(game)
+        
+        # 관련 디바이스에게 변경 알림
+        table_datas : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game.id).all()
+        for table_data in table_datas:
+            table_connect_devices : List[models.AuthDeviceData] = db.query(models.AuthDeviceData).filter(models.AuthDeviceData.connect_table_id == table_data.id).all()
+            devices_sockets : dict[str, device_socket_manager.DeviceSocketConnection] = device_socket_manager.socket_manager._connections
+            for table_connect_device in table_connect_devices:
+                for device_socket in devices_sockets.values():
+                    if device_socket.device_uid == table_connect_device.device_uid:
+                        print(f"device_socket.device_uid : {device_socket.device_uid}")
+                        await device_socket_manager.socket_manager.handle_game_connection(device_socket.device_uid, table_data.id)
+        
+        return JSONResponse(
+            content={"response": 200, "message": "게임 참여 횟수가 업데이트되었습니다"},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        db.rollback()
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()
+        
+
+@router.get("/update-user-in-game-join-count")
 async def update_user_in_game_join_count(game_id: int, user_id: int, is_purchase: bool = False):
     """
     사용자의 게임 참여 횟수를 업데이트합니다.

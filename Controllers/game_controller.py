@@ -445,4 +445,25 @@ async def update_game_final_prize_by_id(game_id: int, game_data: dict):
         )
     finally:
         db.close()
-    
+
+@router.get("/get-max-player-count-by-game-id/{game_id}")
+async def get_max_player_count_by_game_id(game_id: int):
+    """게임의 최대 플레이어 수를 조회합니다."""
+    # 직접 세션 가져오기
+    db = get_db_direct()
+    try:
+        # 게임을 바라보는 테이블 조회
+        table_datas : List[models.TableData] = db.query(models.TableData).filter(models.TableData.game_id == game_id).all()
+        max_player_count = sum(table_data.max_players for table_data in table_datas)
+            
+        return JSONResponse(
+            content={"response": 200, "data": max_player_count},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            content={"response": 500, "message": str(e)},
+            headers={"Content-Type": "application/json; charset=utf-8"}
+        )
+    finally:
+        db.close()

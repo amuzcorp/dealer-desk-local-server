@@ -100,42 +100,44 @@ async def get_current_point_by_user_id(user_id: int):
     db = get_db_direct()
     try:
         # 쿼리 최적화 - 합계 계산을 DB에서 처리
-        total_amount = db.query(
-            db.func.sum(models.PointHistoryData.available_amount)
-        ).filter(
+        total_amount_records = db.query(models.PointHistoryData).filter(
             models.PointHistoryData.customer_id == user_id,
             models.PointHistoryData.is_expired == False,
             models.PointHistoryData.is_increase == True,
             models.PointHistoryData.available_amount > 0
-        ).scalar() or 0
+        ).all()
+        
+        total_amount = sum(point.available_amount for point in total_amount_records)
+        print(f"total_amount : {total_amount}")  # 로그 출력
         
         return JSONResponse(
             content={"response": 200, "message": "현재 포인트 조회 성공", "data": total_amount},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     except Exception as e:
+        print(f"현재 포인트 조회 중 오류 발생: {str(e)}")  # 오류 로그 출력
         return JSONResponse(
             content={"response": 500, "message": f"현재 포인트 조회 중 오류 발생: {str(e)}"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     finally:
         db.close()
-
 @router.get("/get-total-point-by-user-id/{user_id}")
 async def get_total_point_by_user_id(user_id: int):
     """사용자 ID로 총 적립된 포인트를 조회합니다."""
     db = get_db_direct()
     try:
-        # 쿼리 최적화 - 합계 계산을 DB에서 처리
-        total_point = db.query(
-            db.func.sum(models.PointHistoryData.amount)
-        ).filter(
+        # 쿼리 최적화 - 합계 계산을 DB에서 처리 
+        total_amount_records = db.query(models.PointHistoryData).filter(
             models.PointHistoryData.customer_id == user_id,
-            models.PointHistoryData.is_increase == True
-        ).scalar() or 0
-        
+            models.PointHistoryData.is_increase == True,
+            models.PointHistoryData.available_amount > 0
+        ).all()
+         
+        total_amount = sum(point.available_amount for point in total_amount_records)
+        print(f"total_point : {total_amount}")
         return JSONResponse(
-            content={"response": 200, "message": "총 포인트 조회 성공", "data": total_point},
+            content={"response": 200, "message": "총 포인트 조회 성공", "data": total_amount},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     except Exception as e:
@@ -153,17 +155,18 @@ async def get_expire_point_by_user_id(user_id: int):
     try:
         # 쿼리 최적화 - 합계 계산을 DB에서 처리
         total_point = db.query(
-            db.func.sum(models.PointHistoryData.available_amount)
-        ).filter(
             models.PointHistoryData.customer_id == user_id,
             models.PointHistoryData.is_expired == False,
             models.PointHistoryData.is_increase == True,
             models.PointHistoryData.available_amount > 0,
             models.PointHistoryData.expire_at < (datetime.now() + timedelta(days=30))
-        ).scalar() or 0
+        ).all()
         
+        
+        total_point_amount = sum(point.available_amount for point in total_point)
+        print(f"total_point : {total_point_amount}")
         return JSONResponse(
-            content={"response": 200, "message": "만료 예정 포인트 조회 성공", "data": total_point},
+            content={"response": 200, "message": "만료 예정 포인트 조회 성공", "data": total_point_amount},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     except Exception as e:
