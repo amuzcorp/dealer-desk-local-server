@@ -86,8 +86,6 @@ def build_windows_executable():
     # 실행 중인 관련 프로세스 종료
     print("빌드 전 관련 프로세스 종료 중...")
     kill_processes_by_name([
-        "python.exe", 
-        "pythonw.exe", 
         "DealerDesk.exe",
         "uvicorn.exe"
     ])
