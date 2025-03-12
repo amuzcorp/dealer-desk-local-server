@@ -45,7 +45,7 @@ async def create_qr_code(game_id: int):
         response.raise_for_status()  # HTTPError가 발생하면 예외를 발생시킴
         return JSONResponse(content={"message": "QR 코드 생성 완료", "data": response.json()["data"]})
     except requests.exceptions.HTTPError as http_err:
-        print(response.json())
+        # print(response.json())
         return JSONResponse(content={"message": "QR 코드 생성 실패"}, status_code=response.status_code)
     except Exception as err:
         return JSONResponse(content={"message": "QR 코드 생성 중 오류 발생", "error": str(err)}, status_code=500)

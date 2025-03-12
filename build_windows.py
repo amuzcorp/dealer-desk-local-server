@@ -2,15 +2,102 @@ import os
 import sys
 import subprocess
 import shutil
+import time
+import traceback
+import ctypes
+import stat
+
+def is_admin():
+    """현재 프로세스가 관리자 권한으로 실행 중인지 확인"""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except:
+        return False
+
+def force_delete(file_path):
+    """파일 강제 삭제 (잠금 해제 시도)"""
+    try:
+        if os.path.exists(file_path):
+            # 파일 속성 변경 시도
+            os.chmod(file_path, stat.S_IWRITE)
+            # 삭제 시도
+            os.unlink(file_path)
+            return True
+    except Exception as e:
+        print(f"파일 강제 삭제 실패: {file_path}, 오류: {str(e)}")
+        return False
+
+def kill_processes_by_name(process_names):
+    """지정된 이름의 프로세스 종료"""
+    for name in process_names:
+        try:
+            subprocess.run(f"taskkill /f /im {name}", shell=True, check=False)
+            print(f"{name} 프로세스 종료 시도")
+        except Exception as e:
+            print(f"{name} 프로세스 종료 실패: {str(e)}")
+
+def clean_directory(dir_path, retry=3, sleep_time=1):
+    """디렉토리 정리 (재시도 로직 포함)"""
+    if not os.path.exists(dir_path):
+        return
+    
+    print(f"{dir_path} 디렉토리 정리 중...")
+    
+    for attempt in range(retry):
+        try:
+            # 먼저 모든 파일의 쓰기 권한 활성화 시도
+            for root, dirs, files in os.walk(dir_path):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    try:
+                        os.chmod(file_path, stat.S_IWRITE)
+                    except:
+                        pass
+            
+            # 디렉토리 삭제 시도
+            shutil.rmtree(dir_path)
+            print(f"{dir_path} 삭제 성공")
+            return True
+        except Exception as e:
+            print(f"{dir_path} 삭제 시도 {attempt+1}/{retry} 실패: {str(e)}")
+            if attempt < retry - 1:
+                print(f"{sleep_time}초 후 재시도...")
+                time.sleep(sleep_time)
+    
+    print(f"경고: {dir_path} 삭제 실패, 파일 접근 문제가 있을 수 있습니다.")
+    return False
+
+def wait_for_user_confirmation(message="계속하려면 아무 키나 누르세요..."):
+    """사용자 확인 대기"""
+    print(message)
+    input()
 
 def build_windows_executable():
+    print("\n" + "="*80)
     print("Windows 실행 파일 빌드 시작...")
+    print("="*80 + "\n")
+    
+    # 관리자 권한 확인
+    if not is_admin():
+        print("경고: 관리자 권한으로 실행되지 않았습니다. 파일 접근 문제가 발생할 수 있습니다.")
+        print("관리자 권한으로 다시 실행하는 것을 권장합니다.")
+        wait_for_user_confirmation("계속 진행하려면 Enter 키를 누르세요...")
+    
+    # 실행 중인 관련 프로세스 종료
+    print("빌드 전 관련 프로세스 종료 중...")
+    kill_processes_by_name([
+        "python.exe", 
+        "pythonw.exe", 
+        "DealerDesk.exe",
+        "uvicorn.exe"
+    ])
+    
+    # 잠시 대기하여 프로세스가 완전히 종료되도록 함
+    time.sleep(2)
     
     # 빌드 디렉토리 정리
     for dir_to_clean in ["build", "dist"]:
-        if os.path.exists(dir_to_clean):
-            print(f"{dir_to_clean} 디렉토리 정리 중...")
-            shutil.rmtree(dir_to_clean)
+        clean_directory(dir_to_clean)
     
     # 아이콘 파일 생성 (없는 경우)
     create_icon_file()
@@ -53,6 +140,12 @@ def build_windows_executable():
         "tkinter.scrolledtext",
         "tkinter.messagebox",
         "tkinter.filedialog",
+        "fastapi",
+        "starlette",
+        "asyncio",
+        "aiohttp",
+        "logging.handlers",
+        "encodings.idna",
     ]
     
     for imp in hidden_imports:
@@ -67,6 +160,7 @@ def build_windows_executable():
         "starlette",
         "uvicorn",
         "tkinter",
+        "aiohttp",
     ]
     
     for mod in collect_modules:
@@ -103,8 +197,10 @@ def build_windows_executable():
     pyinstaller_cmd.append("tray_app.py")
     
     # PyInstaller 실행
+    print("\n" + "-"*80)
     print("PyInstaller 실행 중...")
     print(f"실행 명령: {' '.join(pyinstaller_cmd)}")
+    print("-"*80 + "\n")
     
     try:
         subprocess.run(pyinstaller_cmd, check=True)
@@ -124,12 +220,16 @@ def build_windows_executable():
     # _internal 디렉토리 확인
     check_internal_dir(dist_dir)
     
+    print("\n" + "="*80)
     print("빌드 완료!")
     print("실행 파일 위치: dist/DealerDesk/DealerDesk.exe")
+    print("="*80)
 
 def manual_copy_files():
     """PyInstaller가 실패한 경우 수동으로 필요한 파일 복사"""
+    print("\n" + "-"*80)
     print("수동으로 파일 복사 시작...")
+    print("-"*80)
     
     # 기본 디렉토리 구조 생성
     dist_dir = os.path.join("dist", "DealerDesk")
@@ -156,14 +256,20 @@ def manual_copy_files():
         if os.path.exists(file):
             dest_path = os.path.join(internal_dir, file)
             print(f"복사 중: {file} -> {dest_path}")
-            shutil.copy2(file, dest_path)
+            try:
+                shutil.copy2(file, dest_path)
+            except Exception as e:
+                print(f"파일 복사 실패: {file}, 오류: {str(e)}")
     
     # 디렉토리 복사
     for dir_name in ["app", "databases", "Controllers"]:
         if os.path.exists(dir_name):
             dest_dir = os.path.join(internal_dir, dir_name)
             print(f"디렉토리 복사 중: {dir_name} -> {dest_dir}")
-            shutil.copytree(dir_name, dest_dir, dirs_exist_ok=True)
+            try:
+                shutil.copytree(dir_name, dest_dir, dirs_exist_ok=True)
+            except Exception as e:
+                print(f"디렉토리 복사 실패: {dir_name}, 오류: {str(e)}")
     
     print("수동 파일 복사 완료")
 
@@ -181,8 +287,15 @@ def check_internal_dir(dist_dir):
         print(f"_internal 디렉토리 확인 완료: {internal_dir}")
         # _internal 디렉토리 내용 출력
         print("_internal 디렉토리 내용:")
-        for item in os.listdir(internal_dir):
-            print(f"  - {item}")
+        try:
+            for item in os.listdir(internal_dir):
+                item_path = os.path.join(internal_dir, item)
+                if os.path.isdir(item_path):
+                    print(f"  - {item}/ (디렉토리)")
+                else:
+                    print(f"  - {item}")
+        except Exception as e:
+            print(f"_internal 디렉토리 내용 확인 중 오류: {str(e)}")
 
 def create_icon_file():
     """간단한 아이콘 파일이 없는 경우 생성"""
@@ -205,8 +318,9 @@ def create_icon_file():
 def create_readme_file(dist_dir):
     """배포 디렉토리에 README 파일 생성"""
     readme_path = os.path.join(dist_dir, "README.txt")
-    with open(readme_path, "w", encoding="utf-8") as f:
-        f.write("""딜러 데스크 트레이 애플리케이션
+    try:
+        with open(readme_path, "w", encoding="utf-8") as f:
+            f.write("""딜러 데스크 트레이 애플리케이션
 
 사용 방법:
 1. DealerDesk.exe 파일을 실행합니다.
@@ -218,9 +332,38 @@ def create_readme_file(dist_dir):
 7. '로그' 메뉴에서 트레이 앱과 런처의 로그를 확인할 수 있습니다.
 8. '종료'를 선택하여 애플리케이션을 종료합니다.
 
+문제 해결:
+- 권한 오류가 발생한다면 관리자 권한으로 실행해보세요.
+- 서버 시작 문제는 로그 파일을 확인하세요.
+- _internal 디렉토리 접근 문제가 있으면 애플리케이션을 종료하고 다시 실행하세요.
+
 참고: 이 애플리케이션은 Python 3.13.2를 기반으로 빌드되었습니다.
 """)
-    print(f"README 파일이 생성되었습니다: {readme_path}")
+        print(f"README 파일이 생성되었습니다: {readme_path}")
+    except Exception as e:
+        print(f"README 파일 생성 실패: {str(e)}")
+
+def create_batch_launcher(dist_dir):
+    """관리자 권한으로 실행하는 배치 파일 생성"""
+    batch_path = os.path.join(dist_dir, "Run_As_Admin.bat")
+    try:
+        with open(batch_path, "w", encoding="utf-8") as f:
+            f.write("""@echo off
+echo 딜러 데스크 트레이 애플리케이션을 관리자 권한으로 실행합니다...
+powershell -Command "Start-Process -FilePath '%~dp0DealerDesk.exe' -Verb RunAs"
+exit
+""")
+        print(f"관리자 권한 실행 배치 파일 생성: {batch_path}")
+    except Exception as e:
+        print(f"배치 파일 생성 실패: {str(e)}")
 
 if __name__ == "__main__":
-    build_windows_executable() 
+    try:
+        build_windows_executable()
+        # 관리자 권한으로 실행하는 배치 파일 생성
+        create_batch_launcher(os.path.join("dist", "DealerDesk"))
+    except Exception as e:
+        print(f"빌드 중 예상치 못한 오류 발생: {str(e)}")
+        traceback.print_exc()
+        wait_for_user_confirmation("오류가 발생했습니다. 종료하려면 Enter 키를 누르세요...")
+        sys.exit(1) 
