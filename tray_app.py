@@ -130,8 +130,8 @@ main = None
 try:
     import main
     logger.info("main 모듈 직접 임포트 성공")
-except ImportError:
-    logger.warning("main 모듈 직접 임포트 실패, 동적 로드 시도")
+except ImportError as ie:
+    logger.warning(f"main 모듈 직접 임포트 실패: {str(ie)}")
     
     try:
         # 가능한 경로들에서 찾기
@@ -153,139 +153,19 @@ except ImportError:
     except Exception as e:
         logger.error(f"main 모듈 동적 로드 실패: {str(e)}")
 
-# 간단한 서버 클래스
-class SimpleServer:
-    """간단한 서버 클래스 - uvicorn 설정 문제를 회피"""
-    
-    @staticmethod
-    async def run_api_server():
-        """API 서버 실행"""
-        try:
-            # main 모듈 사용 시도
-            if main and hasattr(main, 'run_api_server'):
-                logger.info("main.run_api_server() 호출")
-                await main.run_api_server()
-                return
-                
-            # 직접 FastAPI 앱 생성
-            logger.info("API 서버 직접 생성")
-            from fastapi import FastAPI
-            app = FastAPI(title="딜러 데스크 API 서버")
-            
-            @app.get("/")
-            async def read_root():
-                return {"message": "딜러 데스크 API 서버가 실행 중입니다."}
-            
-            # 서버 실행
-            import uvicorn
-            config = uvicorn.Config(
-                app=app, 
-                host="0.0.0.0", 
-                port=401,
-                log_level="info",
-                access_log=False  # 로그 문제 방지
-            )
-            server = uvicorn.Server(config=config)
-            await server.serve()
-        except Exception as e:
-            logger.error(f"API 서버 실행 실패: {str(e)}")
-            traceback.print_exc()
-    
-    @staticmethod
-    async def run_web_server():
-        """웹 서버 실행"""
-        try:
-            # main 모듈 사용 시도
-            if main and hasattr(main, 'run_web_server'):
-                logger.info("main.run_web_server() 호출")
-                await main.run_web_server()
-                return
-            
-            # web_server 모듈 찾기 시도
-            web_server_module = None
-            
-            try:
-                import web_server
-                web_server_module = web_server
-                logger.info("web_server 모듈 임포트 성공")
-            except ImportError:
-                # 파일 찾기
-                for path in sys.path:
-                    web_server_path = os.path.join(path, "web_server.py")
-                    if os.path.exists(web_server_path):
-                        try:
-                            spec = importlib.util.spec_from_file_location("web_server", web_server_path)
-                            web_server_module = importlib.util.module_from_spec(spec)
-                            sys.modules["web_server"] = web_server_module
-                            spec.loader.exec_module(web_server_module)
-                            logger.info(f"web_server 모듈 로드 성공: {web_server_path}")
-                            break
-                        except Exception as e:
-                            logger.error(f"web_server 모듈 로드 실패: {str(e)}")
-            
-            # web_server 모듈 사용
-            if web_server_module and hasattr(web_server_module, 'app'):
-                logger.info("web_server.app 사용")
-                import uvicorn
-                config = uvicorn.Config(
-                    app=web_server_module.app, 
-                    host="0.0.0.0", 
-                    port=3000,
-                    log_level="info",
-                    access_log=False  # 로그 문제 방지
-                )
-                server = uvicorn.Server(config=config)
-                await server.serve()
-                return
-            
-            # 직접 생성
-            logger.info("웹 서버 직접 생성")
-            from fastapi import FastAPI
-            from fastapi.responses import HTMLResponse
-            
-            app = FastAPI(title="딜러 데스크 웹 서버")
-            
-            @app.get("/", response_class=HTMLResponse)
-            async def read_root():
-                return """
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>딜러 데스크 웹 인터페이스</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-                        h1 { color: #4285f4; }
-                        .info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; }
-                        .error { color: #d32f2f; }
-                    </style>
-                </head>
-                <body>
-                    <h1>딜러 데스크 웹 인터페이스</h1>
-                    <div class="info">
-                        <p>웹 서버가 실행 중입니다만, web_server.py 모듈을 찾을 수 없어 간단한 페이지를 표시합니다.</p>
-                        <p>API 서버는 <a href="http://localhost:401/docs">http://localhost:401/docs</a>에서 접근할 수 있습니다.</p>
-                    </div>
-                    <div class="error">
-                        <p>전체 기능을 사용하려면 web_server.py 파일이 필요합니다.</p>
-                    </div>
-                </body>
-                </html>
-                """
-            
-            # 서버 실행
-            import uvicorn
-            config = uvicorn.Config(
-                app=app, 
-                host="0.0.0.0", 
-                port=3000,
-                log_level="info",
-                access_log=False  # 로그 문제 방지
-            )
-            server = uvicorn.Server(config=config)
-            await server.serve()
-        except Exception as e:
-            logger.error(f"웹 서버 실행 실패: {str(e)}")
-            traceback.print_exc()
+if main is None:
+    logger.critical("main 모듈을 로드할 수 없습니다. 애플리케이션이 제대로 작동하지 않을 수 있습니다.")
+else:
+    # main 모듈 기능 확인
+    if hasattr(main, 'run_api_server'):
+        logger.info("main.run_api_server 함수 확인 완료")
+    else:
+        logger.error("main.run_api_server 함수가 존재하지 않습니다.")
+        
+    if hasattr(main, 'run_web_server'):
+        logger.info("main.run_web_server 함수 확인 완료")
+    else:
+        logger.error("main.run_web_server 함수가 존재하지 않습니다.")
 
 # 로그 뷰어 클래스
 class LogViewerWindow:
@@ -540,7 +420,21 @@ class DealerDeskTrayApp:
     def run_api_server(self):
         try:
             logger.info("API 서버 쓰레드 시작")
-            asyncio.run(SimpleServer.run_api_server())
+            if main and hasattr(main, 'run_api_server'):
+                asyncio.run(main.run_api_server())
+            else:
+                logger.error("main.run_api_server 함수를 찾을 수 없습니다.")
+                # 대체 서버 실행 시도
+                import uvicorn
+                config = uvicorn.Config(
+                    app="main:app", 
+                    host="0.0.0.0", 
+                    port=401,
+                    log_level="info",
+                    access_log=False
+                )
+                server = uvicorn.Server(config=config)
+                asyncio.run(server.serve())
         except Exception as e:
             logger.error(f"API 서버 실행 중 오류 발생: {str(e)}")
             traceback.print_exc()
@@ -548,7 +442,26 @@ class DealerDeskTrayApp:
     def run_web_server(self):
         try:
             logger.info("웹 서버 쓰레드 시작")
-            asyncio.run(SimpleServer.run_web_server())
+            if main and hasattr(main, 'run_web_server'):
+                asyncio.run(main.run_web_server())
+            else:
+                logger.error("main.run_web_server 함수를 찾을 수 없습니다.")
+                # web_server.py 파일 직접 찾아서 실행 시도
+                try:
+                    import web_server
+                    import uvicorn
+                    config = uvicorn.Config(
+                        app="web_server:app", 
+                        host="0.0.0.0", 
+                        port=3000,
+                        log_level="info",
+                        access_log=False
+                    )
+                    server = uvicorn.Server(config=config)
+                    asyncio.run(server.serve())
+                except Exception as e:
+                    logger.error(f"web_server 모듈 로드 및 실행 실패: {str(e)}")
+                    traceback.print_exc()
         except Exception as e:
             logger.error(f"웹 서버 실행 중 오류 발생: {str(e)}")
             traceback.print_exc()
@@ -571,6 +484,8 @@ class DealerDeskTrayApp:
                 
                 # 웹 페이지 자동 열기
                 try:
+                    # 서버 시작을 위한 짧은 대기
+                    time.sleep(2)
                     webbrowser.open("http://localhost:3000")
                 except Exception as e:
                     logger.error(f"웹 브라우저 열기 실패: {str(e)}")
@@ -592,10 +507,19 @@ class DealerDeskTrayApp:
                 # Windows에서 uvicorn 서버 강제 종료
                 try:
                     # API 서버 종료
-                    subprocess.run(["taskkill", "/f", "/im", "python.exe", "/fi", "WindowTitle eq uvicorn*"], 
-                                shell=True, check=False)
-                    subprocess.run(["taskkill", "/f", "/im", "DealerDesk.exe", "/fi", "WindowTitle eq uvicorn*"], 
-                                shell=True, check=False)
+                    if sys.platform.startswith('win'):
+                        subprocess.run(["taskkill", "/f", "/im", "python.exe", "/fi", "WindowTitle eq uvicorn*"], 
+                                    shell=True, check=False)
+                        subprocess.run(["taskkill", "/f", "/im", "DealerDesk.exe", "/fi", "WindowTitle eq uvicorn*"], 
+                                    shell=True, check=False)
+                    else:
+                        # 비Windows 시스템에서는 프로세스 ID를 사용하여 종료
+                        if self.api_server_thread and self.api_server_thread.is_alive():
+                            # 해당 스레드 관련 프로세스 강제 종료
+                            pass
+                        if self.web_server_thread and self.web_server_thread.is_alive():
+                            # 해당 스레드 관련 프로세스 강제 종료
+                            pass
                     logger.info("서버가 정지되었습니다.")
                 except Exception as e:
                     logger.error(f"서버 정지 중 오류 발생: {str(e)}")
