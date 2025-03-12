@@ -59,7 +59,7 @@ async def create_preset(preset_data: schemas.PresetData):
 async def update_preset(preset_id: int, preset_data: schemas.PresetData):
     """프리셋 업데이트 엔드포인트"""
     # 직접 세션 가져오기
-    db = get_db_direct()
+    db :Session = get_db_direct()
     try:
         preset = db.query(models.PresetData).filter(models.PresetData.id == preset_id).first()
         if not preset:
@@ -68,7 +68,7 @@ async def update_preset(preset_id: int, preset_data: schemas.PresetData):
                 headers={"Content-Type": "application/json; charset=utf-8"}
             )
         
-        # 프리셋 데이터 업데이트
+        # 프리셋 데이터 직접 업데이트
         preset.preset_name = preset_data.preset_name
         preset.time_table_data = preset_data.time_table_data
         preset.buy_in_price = preset_data.buy_in_price
@@ -79,20 +79,37 @@ async def update_preset(preset_id: int, preset_data: schemas.PresetData):
         preset.addon_data = preset_data.addon_data
         preset.prize_settings = preset_data.prize_settings
         preset.rebuy_cut_off = preset_data.rebuy_cut_off
-        
+
         db.commit()
         db.refresh(preset)
         
+        # 데이터 검증을 위한 로깅 추가
+        print("Updated preset data:")
+        print(f"preset_name: {preset.preset_name}")
+        print(f"time_table_data: {preset.time_table_data}")
+        print(f"buy_in_price: {preset.buy_in_price}")
+        print(f"re_buy_in_price: {preset.re_buy_in_price}")
+        print(f"starting_chip: {preset.starting_chip}")
+        print(f"rebuyin_payment_chips: {preset.rebuyin_payment_chips}")
+        print(f"rebuyin_number_limits: {preset.rebuyin_number_limits}")
+        print(f"addon_data: {preset.addon_data}")
+        print(f"prize_settings: {preset.prize_settings}")
+        print(f"rebuy_cut_off: {preset.rebuy_cut_off}")
+        
         import main
-        print("prseet sended")
         await main.socket_controller.save_preset(presets=preset)
         
         return JSONResponse(
-            content={"response": 200, "message": "프리셋이 업데이트되었습니다"},
+            content={
+                "response": 200, 
+                "message": "프리셋이 업데이트되었습니다",
+                "data": preset.to_json() # 업데이트된 데이터 반환
+            },
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     except Exception as e:
         db.rollback()
+        print(f"Error updating preset: {str(e)}")  # 에러 로깅 추가
         return JSONResponse(
             content={"response": 500, "message": str(e)},
             headers={"Content-Type": "application/json; charset=utf-8"}

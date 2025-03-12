@@ -30,7 +30,7 @@ async def create_qr_code(game_id: int):
     import ssl
     from fastapi import HTTPException
 
-    qr_request_uri = f"http://dealer-desk.dev.amuz.kr/api/game/qr/{game_id}/{main.socket_controller.store_host_name}"
+    qr_request_uri = f"http://dealerdesk.app/api/game/qr/{game_id}/{main.socket_controller.store_host_name}"
     
     # SSL 인증서 검증을 비활성화하는 컨텍스트 생성
     ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
@@ -45,6 +45,7 @@ async def create_qr_code(game_id: int):
         response.raise_for_status()  # HTTPError가 발생하면 예외를 발생시킴
         return JSONResponse(content={"message": "QR 코드 생성 완료", "data": response.json()["data"]})
     except requests.exceptions.HTTPError as http_err:
+        print(response.json())
         return JSONResponse(content={"message": "QR 코드 생성 실패"}, status_code=response.status_code)
     except Exception as err:
         return JSONResponse(content={"message": "QR 코드 생성 중 오류 발생", "error": str(err)}, status_code=500)
