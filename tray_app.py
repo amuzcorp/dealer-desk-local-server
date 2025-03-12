@@ -19,12 +19,30 @@ import uvicorn
 import uvicorn.config
 import uvicorn.lifespan
 
+# 로그 파일 경로 설정 (먼저 정의해야 함)
+log_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+tray_log_file = os.path.join(log_dir, "dealer_desk_tray.log")
+launcher_log_file = os.path.join(log_dir, "dealerdesk_launcher.log")
+
+# 로깅 설정 - uvicorn과의 충돌을 방지하기 위해 기본 설정만 사용
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(tray_log_file, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
+# 로거 생성 (Uvicorn 로거와 충돌 방지)
+logger = logging.getLogger("DealerDeskTray")
+logger.propagate = False  # 로그 전파 방지
+
 # 실행 환경 설정
 if getattr(sys, 'frozen', False):
     # PyInstaller로 빌드된 실행 파일인 경우
     application_path = sys._MEIPASS
     
-    print(f"PyInstaller 환경에서 실행 중: {application_path}")
+    logger.info(f"PyInstaller 환경에서 실행 중: {application_path}")
     
     # _internal 디렉토리 경로 계산 (여러 방법으로 시도)
     internal_path = None
@@ -32,12 +50,12 @@ if getattr(sys, 'frozen', False):
     # 1. 환경 변수에서 확인
     if "INTERNAL_DIR" in os.environ and os.path.exists(os.environ["INTERNAL_DIR"]):
         internal_path = os.environ["INTERNAL_DIR"]
-        print(f"환경 변수에서 _internal 경로 발견: {internal_path}")
+        logger.info(f"환경 변수에서 _internal 경로 발견: {internal_path}")
     
     # 2. application_path 내에서 확인
     elif os.path.exists(os.path.join(application_path, "_internal")):
         internal_path = os.path.join(application_path, "_internal")
-        print(f"application_path 내에서 _internal 경로 발견: {internal_path}")
+        logger.info(f"application_path 내에서 _internal 경로 발견: {internal_path}")
     
     # 3. 실행 파일 위치에서 확인
     else:
@@ -46,20 +64,20 @@ if getattr(sys, 'frozen', False):
         
         if os.path.exists(potential_internal):
             internal_path = potential_internal
-            print(f"실행 파일 위치에서 _internal 경로 발견: {internal_path}")
+            logger.info(f"실행 파일 위치에서 _internal 경로 발견: {internal_path}")
         else:
             # 4. 없으면 실행 파일 위치에 생성
             try:
                 os.makedirs(potential_internal, exist_ok=True)
                 internal_path = potential_internal
-                print(f"_internal 디렉토리를 생성했습니다: {internal_path}")
+                logger.info(f"_internal 디렉토리를 생성했습니다: {internal_path}")
             except Exception as e:
-                print(f"_internal 디렉토리 생성 실패: {str(e)}")
+                logger.error(f"_internal 디렉토리 생성 실패: {str(e)}")
                 # 5. 최후의 수단으로 현재 작업 디렉토리에 생성
                 current_dir_internal = os.path.join(os.getcwd(), "_internal")
                 os.makedirs(current_dir_internal, exist_ok=True)
                 internal_path = current_dir_internal
-                print(f"현재 작업 디렉토리에 _internal 생성: {internal_path}")
+                logger.info(f"현재 작업 디렉토리에 _internal 생성: {internal_path}")
     
     # 필요한 모듈 경로 추가
     for path in [application_path, internal_path]:
@@ -67,23 +85,23 @@ if getattr(sys, 'frozen', False):
             sys.path.insert(0, path)
     
     # 모듈 검색 경로 출력 (디버깅용)
-    print("Python 모듈 검색 경로:")
+    logger.info("Python 모듈 검색 경로:")
     for path in sys.path:
-        print(f"  - {path}")
+        logger.info(f"  - {path}")
     
     # importlib을 사용하여 동적으로 모듈 로드
     def load_module(module_name, module_path):
         try:
-            print(f"모듈 로드 시도: {module_name} (경로: {module_path})")
+            logger.info(f"모듈 로드 시도: {module_name} (경로: {module_path})")
             
             if not os.path.exists(module_path):
-                print(f"모듈 파일이 존재하지 않습니다: {module_path}")
+                logger.info(f"모듈 파일이 존재하지 않습니다: {module_path}")
                 
                 # 다른 경로에서 찾아보기
                 for search_path in sys.path:
                     alt_path = os.path.join(search_path, f"{module_name}.py")
                     if os.path.exists(alt_path):
-                        print(f"대체 경로에서 모듈 발견: {alt_path}")
+                        logger.info(f"대체 경로에서 모듈 발견: {alt_path}")
                         module_path = alt_path
                         break
             
@@ -92,22 +110,22 @@ if getattr(sys, 'frozen', False):
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[module_name] = module
                 spec.loader.exec_module(module)
-                print(f"모듈 {module_name} 로드 성공")
+                logger.info(f"모듈 {module_name} 로드 성공")
                 return module
             else:
-                print(f"모듈 {module_name}의 spec을 찾을 수 없습니다. 경로: {module_path}")
+                logger.error(f"모듈 {module_name}의 spec을 찾을 수 없습니다. 경로: {module_path}")
                 
                 # 직접 import 시도
                 try:
-                    print(f"{module_name} 모듈을 importlib.import_module로 시도")
+                    logger.info(f"{module_name} 모듈을 importlib.import_module로 시도")
                     import importlib
                     return importlib.import_module(module_name)
                 except Exception as e:
-                    print(f"직접 import 실패: {str(e)}")
+                    logger.error(f"직접 import 실패: {str(e)}")
                 
                 return None
         except Exception as e:
-            print(f"모듈 {module_name} 로드 중 오류 발생: {str(e)}")
+            logger.error(f"모듈 {module_name} 로드 중 오류 발생: {str(e)}")
             return None
     
     # main 모듈 로드 시도 (여러 경로에서)
@@ -121,13 +139,13 @@ if getattr(sys, 'frozen', False):
     
     for path in possible_paths:
         if os.path.exists(path):
-            print(f"main.py 발견: {path}")
+            logger.info(f"main.py 발견: {path}")
             main = load_module("main", path)
             if main:
                 break
     
     if not main:
-        print("main 모듈을 로드할 수 없습니다. 응용 프로그램이 제대로 작동하지 않을 수 있습니다.")
+        logger.warning("main 모듈을 로드할 수 없습니다. 직접 웹 서버 실행 모드로 전환합니다.")
 else:
     # 일반 Python 스크립트로 실행되는 경우
     application_path = os.path.dirname(os.path.abspath(__file__))
@@ -137,37 +155,69 @@ else:
             sys.path.insert(0, internal_path)
     try:
         import main
+        logger.info("main 모듈 로드 성공 (일반 실행 모드)")
     except ImportError:
-        print("main 모듈을 가져올 수 없습니다.")
-        sys.exit(1)
-
-# 로그 파일 경로 설정
-log_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
-tray_log_file = os.path.join(log_dir, "dealer_desk_tray.log")
-launcher_log_file = os.path.join(log_dir, "dealerdesk_launcher.log")
-
-# 로깅 설정
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(tray_log_file),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger("DealerDeskTray")
+        logger.error("main 모듈을 가져올 수 없습니다. 직접 웹 서버 실행 모드로 전환합니다.")
+        main = None
 
 # 직접 구현한 Uvicorn 서버 클래스
 class UvicornServer:
-    def __init__(self, app, host="0.0.0.0", port=401):
-        self.app = app
+    def __init__(self, app_import_string, host="0.0.0.0", port=401):
+        self.app_import_string = app_import_string
         self.host = host
         self.port = port
-        self.config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        
+        # Uvicorn 로그 관련 문제 해결을 위한 설정
+        log_config = {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "simple": {
+                    "format": "%(levelname)s: %(message)s",
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "level": "INFO",
+                    "formatter": "simple",
+                }
+            },
+            "loggers": {
+                "uvicorn": {
+                    "level": "INFO",
+                    "handlers": ["console"],
+                    "propagate": False,
+                },
+                "uvicorn.error": {
+                    "level": "INFO",
+                    "handlers": ["console"],
+                    "propagate": False,
+                },
+                "uvicorn.access": {
+                    "level": "INFO",
+                    "handlers": ["console"],
+                    "propagate": False,
+                },
+            }
+        }
+        
+        # 직접 로그 설정을 제공하여 'default' 포맷터 문제 회피
+        self.config = uvicorn.Config(
+            app=self.app_import_string, 
+            host=self.host, 
+            port=self.port, 
+            log_level="info",
+            log_config=log_config
+        )
         self.server = uvicorn.Server(config=self.config)
     
     async def run(self):
-        await self.server.serve()
+        try:
+            logger.info(f"Uvicorn 서버 시작: {self.app_import_string} (호스트: {self.host}, 포트: {self.port})")
+            await self.server.serve()
+        except Exception as e:
+            logger.error(f"Uvicorn 서버 실행 중 오류: {str(e)}")
 
 # 로그 뷰어 클래스
 class LogViewerWindow:
@@ -407,14 +457,42 @@ class DealerDeskTrayApp:
         try:
             logger.info("API 서버 시작 중...")
             # main 모듈 사용 여부 확인
-            if hasattr(main, 'run_api_server'):
+            if main and hasattr(main, 'run_api_server'):
                 logger.info("main 모듈의 run_api_server 함수 사용")
                 asyncio.run(main.run_api_server())
             else:
                 # 직접 API 서버 실행
                 logger.info("API 서버 직접 실행 (main 모듈의 run_api_server 함수 없음)")
-                api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
-                asyncio.run(api_server.run())
+                # 모듈 검색 경로에 현재 작업 디렉토리 추가
+                if os.getcwd() not in sys.path:
+                    sys.path.insert(0, os.getcwd())
+                
+                # 절대 경로 형식의 모듈 임포트 시도
+                try:
+                    api_server = UvicornServer("main:app", host="0.0.0.0", port=401)
+                    asyncio.run(api_server.run())
+                except (ModuleNotFoundError, ImportError) as e:
+                    logger.error(f"main 모듈을 찾을 수 없습니다: {str(e)}")
+                    
+                    # 모듈 직접 생성 시도
+                    logger.info("API 서버 직접 생성 시도...")
+                    
+                    # 기본 FastAPI 앱 생성
+                    try:
+                        from fastapi import FastAPI
+                        app = FastAPI(title="딜러 데스크 API 서버")
+                        
+                        @app.get("/")
+                        async def read_root():
+                            return {"message": "딜러 데스크 API 서버가 실행 중입니다."}
+                        
+                        # 서버 실행
+                        config = uvicorn.Config(app=app, host="0.0.0.0", port=401)
+                        server = uvicorn.Server(config=config)
+                        asyncio.run(server.serve())
+                    except Exception as e:
+                        logger.error(f"API 서버 직접 생성 실패: {str(e)}")
+                
         except Exception as e:
             logger.error(f"API 서버 실행 중 오류 발생: {str(e)}")
     
@@ -422,16 +500,87 @@ class DealerDeskTrayApp:
         try:
             logger.info("웹 서버 시작 중...")
             # main 모듈 사용 여부 확인
-            if hasattr(main, 'run_web_server'):
+            if main and hasattr(main, 'run_web_server'):
                 logger.info("main 모듈의 run_web_server 함수 사용")
                 asyncio.run(main.run_web_server())
             else:
                 # 직접 웹 서버 실행
                 logger.info("웹 서버 직접 실행 (main 모듈의 run_web_server 함수 없음)")
-                web_server = UvicornServer(app="web_server:app", host="0.0.0.0", port=3000)
-                asyncio.run(web_server.run())
+                
+                # 모듈 검색 경로에 현재 작업 디렉토리 추가
+                if os.getcwd() not in sys.path:
+                    sys.path.insert(0, os.getcwd())
+                
+                # web_server 모듈 확인
+                web_server_paths = [
+                    os.path.join(application_path, "web_server.py"),
+                    os.path.join(internal_path, "web_server.py") if internal_path else None,
+                    os.path.join(os.getcwd(), "web_server.py")
+                ]
+                
+                web_server_exists = False
+                for path in web_server_paths:
+                    if path and os.path.exists(path):
+                        logger.info(f"web_server.py 발견: {path}")
+                        web_server_exists = True
+                        break
+                
+                if web_server_exists:
+                    try:
+                        web_server = UvicornServer("web_server:app", host="0.0.0.0", port=3000)
+                        asyncio.run(web_server.run())
+                    except (ModuleNotFoundError, ImportError) as e:
+                        logger.error(f"web_server 모듈을 찾을 수 없습니다: {str(e)}")
+                        self.create_simple_web_server()
+                else:
+                    logger.warning("web_server.py를 찾을 수 없습니다. 간단한 웹 서버를 생성합니다.")
+                    self.create_simple_web_server()
         except Exception as e:
             logger.error(f"웹 서버 실행 중 오류 발생: {str(e)}")
+    
+    def create_simple_web_server(self):
+        """간단한 웹 서버 직접 생성"""
+        try:
+            logger.info("간단한 웹 서버 생성 중...")
+            
+            from fastapi import FastAPI
+            from fastapi.responses import HTMLResponse
+            
+            app = FastAPI(title="딜러 데스크 웹 서버")
+            
+            @app.get("/", response_class=HTMLResponse)
+            async def read_root():
+                return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>딜러 데스크 웹 인터페이스</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+                        h1 { color: #4285f4; }
+                        .info { background-color: #f5f5f5; padding: 15px; border-radius: 5px; }
+                        .error { color: #d32f2f; }
+                    </style>
+                </head>
+                <body>
+                    <h1>딜러 데스크 웹 인터페이스</h1>
+                    <div class="info">
+                        <p>웹 서버가 실행 중입니다만, web_server.py 모듈을 찾을 수 없어 간단한 페이지를 표시합니다.</p>
+                        <p>API 서버는 <a href="http://localhost:401/docs">http://localhost:401/docs</a>에서 접근할 수 있습니다.</p>
+                    </div>
+                    <div class="error">
+                        <p>전체 기능을 사용하려면 web_server.py 파일이 필요합니다.</p>
+                    </div>
+                </body>
+                </html>
+                """
+            
+            # 서버 실행
+            config = uvicorn.Config(app=app, host="0.0.0.0", port=3000)
+            server = uvicorn.Server(config=config)
+            asyncio.run(server.serve())
+        except Exception as e:
+            logger.error(f"간단한 웹 서버 생성 실패: {str(e)}")
     
     def start_server(self, icon, item):
         if not self.is_running:
