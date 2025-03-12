@@ -166,7 +166,7 @@ class UvicornServer:
         await self.server.serve()
 
 async def run_api_server():
-    api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
+    api_server = UvicornServer(app="/Users/gimjuyeong/Projects/dealer-desk-local-server/main:app", host="0.0.0.0", port=401)
     await api_server.run()
 
 async def run_web_server():
@@ -192,5 +192,5 @@ async def run_all():
         run_web_server()
     )
 
-# if __name__ == "__main__":
-#     asyncio.run(run_all())
+if __name__ == "__main__":
+    asyncio.run(run_all())
