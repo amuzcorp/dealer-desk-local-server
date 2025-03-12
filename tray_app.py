@@ -7,6 +7,9 @@ import subprocess
 import logging
 import signal
 import importlib.util
+import tkinter as tk
+from tkinter import scrolledtext
+from tkinter import ttk
 from PIL import Image
 import pystray
 from pystray import MenuItem as item
@@ -133,18 +136,123 @@ else:
         print("main 모듈을 가져올 수 없습니다.")
         sys.exit(1)
 
-# 로깅 설정
+# 로그 파일 경로 설정
 log_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
-log_file = os.path.join(log_dir, "dealer_desk_tray.log")
+tray_log_file = os.path.join(log_dir, "dealer_desk_tray.log")
+launcher_log_file = os.path.join(log_dir, "dealerdesk_launcher.log")
+
+# 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler(log_file),
+        logging.FileHandler(tray_log_file),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger("DealerDeskTray")
+
+# 로그 뷰어 클래스
+class LogViewerWindow:
+    def __init__(self, log_file, title):
+        self.log_file = log_file
+        self.title = title
+        self.root = None
+        self.text_area = None
+        self.auto_scroll = True
+        self.update_interval = 1000  # 1초마다 업데이트
+        
+    def show(self):
+        if self.root is not None and self.root.winfo_exists():
+            self.root.lift()  # 이미 존재하면 창을 앞으로 가져옴
+            return
+            
+        # 새 창 생성
+        self.root = tk.Tk()
+        self.root.title(self.title)
+        self.root.geometry("800x600")
+        
+        # 프레임 설정
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # 툴바 프레임
+        toolbar_frame = ttk.Frame(main_frame)
+        toolbar_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        # 자동 스크롤 체크박스
+        self.auto_scroll_var = tk.BooleanVar(value=True)
+        auto_scroll_check = ttk.Checkbutton(
+            toolbar_frame, 
+            text="자동 스크롤", 
+            variable=self.auto_scroll_var,
+            command=self.toggle_auto_scroll
+        )
+        auto_scroll_check.pack(side=tk.LEFT, padx=5)
+        
+        # 새로고침 버튼
+        refresh_button = ttk.Button(toolbar_frame, text="새로고침", command=self.refresh_log)
+        refresh_button.pack(side=tk.LEFT, padx=5)
+        
+        # 로그 지우기 버튼
+        clear_button = ttk.Button(toolbar_frame, text="로그 지우기", command=self.clear_log_area)
+        clear_button.pack(side=tk.LEFT, padx=5)
+        
+        # 텍스트 영역
+        self.text_area = scrolledtext.ScrolledText(main_frame, wrap=tk.WORD)
+        self.text_area.pack(fill=tk.BOTH, expand=True)
+        
+        # 로그 로드
+        self.refresh_log()
+        
+        # 주기적으로 업데이트
+        self.schedule_update()
+        
+        # 창 닫을 때 처리
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        
+        # 창 실행
+        self.root.mainloop()
+    
+    def toggle_auto_scroll(self):
+        self.auto_scroll = self.auto_scroll_var.get()
+    
+    def refresh_log(self):
+        try:
+            with open(self.log_file, 'r', encoding='utf-8') as file:
+                content = file.read()
+                self.text_area.delete(1.0, tk.END)
+                self.text_area.insert(tk.END, content)
+                if self.auto_scroll:
+                    self.text_area.see(tk.END)  # 스크롤을 끝으로
+        except Exception as e:
+            self.text_area.delete(1.0, tk.END)
+            self.text_area.insert(tk.END, f"로그 파일을 읽을 수 없습니다: {str(e)}")
+    
+    def clear_log_area(self):
+        self.text_area.delete(1.0, tk.END)
+    
+    def schedule_update(self):
+        if self.root and self.root.winfo_exists():
+            self.refresh_log()
+            self.root.after(self.update_interval, self.schedule_update)
+    
+    def on_close(self):
+        self.root.destroy()
+        self.root = None
+
+# 외부 텍스트 에디터로 로그 파일 열기
+def open_log_with_external_editor(log_file):
+    try:
+        if sys.platform.startswith('win'):
+            os.startfile(log_file)
+        elif sys.platform.startswith('darwin'):  # macOS
+            subprocess.call(['open', log_file])
+        else:  # Linux
+            subprocess.call(['xdg-open', log_file])
+        logger.info(f"외부 에디터로 로그 파일 열기: {log_file}")
+    except Exception as e:
+        logger.error(f"로그 파일 열기 실패: {str(e)}")
 
 class DealerDeskTrayApp:
     def __init__(self):
@@ -152,6 +260,7 @@ class DealerDeskTrayApp:
         self.web_server_thread = None
         self.is_running = False
         self.icon = None
+        self.log_viewers = {}
         self.setup_icon()
         
     def setup_icon(self):
@@ -210,7 +319,16 @@ class DealerDeskTrayApp:
             item('웹 인터페이스 열기', self.open_web_interface),
             item('서버 시작', self.start_server),
             item('서버 정지', self.stop_server, enabled=False),
+            item('로그', self.create_log_submenu()),
             item('종료', self.exit_app)
+        )
+    
+    def create_log_submenu(self):
+        return pystray.Menu(
+            item('트레이 로그 보기 (내부)', self.open_tray_log_viewer),
+            item('런처 로그 보기 (내부)', self.open_launcher_log_viewer),
+            item('트레이 로그 파일 열기 (외부)', self.open_tray_log_external),
+            item('런처 로그 파일 열기 (외부)', self.open_launcher_log_external)
         )
         
     def update_menu(self):
@@ -220,8 +338,42 @@ class DealerDeskTrayApp:
             item('웹 인터페이스 열기', self.open_web_interface, enabled=self.is_running),
             item('서버 시작', self.start_server, enabled=not self.is_running),
             item('서버 정지', self.stop_server, enabled=self.is_running),
+            item('로그', self.create_log_submenu()),
             item('종료', self.exit_app)
         )
+    
+    def open_tray_log_viewer(self, icon, item):
+        self.open_log_viewer(tray_log_file, "딜러 데스크 트레이 로그")
+    
+    def open_launcher_log_viewer(self, icon, item):
+        self.open_log_viewer(launcher_log_file, "딜러 데스크 런처 로그")
+    
+    def open_tray_log_external(self, icon, item):
+        open_log_with_external_editor(tray_log_file)
+    
+    def open_launcher_log_external(self, icon, item):
+        open_log_with_external_editor(launcher_log_file)
+    
+    def open_log_viewer(self, log_file, title):
+        if not os.path.exists(log_file):
+            logger.warning(f"로그 파일이 존재하지 않습니다: {log_file}")
+            return
+            
+        viewer_key = log_file
+        
+        # 이미 뷰어가 있는지 확인
+        if viewer_key in self.log_viewers and hasattr(self.log_viewers[viewer_key], 'root') and self.log_viewers[viewer_key].root and self.log_viewers[viewer_key].root.winfo_exists():
+            # 이미 창이 열려있으면 앞으로 가져옴
+            self.log_viewers[viewer_key].root.lift()
+            return
+        
+        # 새 뷰어 생성
+        viewer = LogViewerWindow(log_file, title)
+        self.log_viewers[viewer_key] = viewer
+        
+        # 별도 스레드에서 뷰어 실행
+        threading.Thread(target=viewer.show, daemon=True).start()
+        logger.info(f"로그 뷰어를 열었습니다: {title}")
         
     def status_action(self, icon, item):
         # 상태 표시용 더미 함수
@@ -297,6 +449,15 @@ class DealerDeskTrayApp:
         logger.info("애플리케이션 종료 중...")
         if self.is_running:
             self.stop_server(icon, item)
+        
+        # 열려 있는 로그 뷰어 창 닫기
+        for viewer_key, viewer in list(self.log_viewers.items()):
+            if hasattr(viewer, 'root') and viewer.root:
+                try:
+                    viewer.root.destroy()
+                except:
+                    pass
+        
         icon.stop()
         sys.exit(0)
     

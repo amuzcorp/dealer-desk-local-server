@@ -48,6 +48,11 @@ def build_windows_executable():
         "starlette.middleware",
         "starlette.middleware.cors",
         "starlette.responses",
+        "tkinter",
+        "tkinter.ttk",
+        "tkinter.scrolledtext",
+        "tkinter.messagebox",
+        "tkinter.filedialog",
     ]
     
     for imp in hidden_imports:
@@ -61,6 +66,7 @@ def build_windows_executable():
         "fastapi",
         "starlette",
         "uvicorn",
+        "tkinter",
     ]
     
     for mod in collect_modules:
@@ -209,7 +215,8 @@ def create_readme_file(dist_dir):
 4. '서버 시작'을 선택하여 서버를 실행하고 웹 인터페이스를 엽니다.
 5. '서버 정지'를 선택하여 서버를 중지합니다.
 6. '웹 인터페이스 열기'를 선택하여 브라우저에서 웹 인터페이스를 엽니다.
-7. '종료'를 선택하여 애플리케이션을 종료합니다.
+7. '로그' 메뉴에서 트레이 앱과 런처의 로그를 확인할 수 있습니다.
+8. '종료'를 선택하여 애플리케이션을 종료합니다.
 
 참고: 이 애플리케이션은 Python 3.13.2를 기반으로 빌드되었습니다.
 """)
