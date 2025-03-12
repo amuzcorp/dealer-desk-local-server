@@ -14,6 +14,11 @@ from PIL import Image
 import pystray
 from pystray import MenuItem as item
 
+# uvicorn 서버를 직접 실행하기 위한 임포트 추가
+import uvicorn
+import uvicorn.config
+import uvicorn.lifespan
+
 # 실행 환경 설정
 if getattr(sys, 'frozen', False):
     # PyInstaller로 빌드된 실행 파일인 경우
@@ -151,6 +156,18 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("DealerDeskTray")
+
+# 직접 구현한 Uvicorn 서버 클래스
+class UvicornServer:
+    def __init__(self, app, host="0.0.0.0", port=401):
+        self.app = app
+        self.host = host
+        self.port = port
+        self.config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        self.server = uvicorn.Server(config=self.config)
+    
+    async def run(self):
+        await self.server.serve()
 
 # 로그 뷰어 클래스
 class LogViewerWindow:
@@ -389,20 +406,30 @@ class DealerDeskTrayApp:
     def run_api_server(self):
         try:
             logger.info("API 서버 시작 중...")
+            # main 모듈 사용 여부 확인
             if hasattr(main, 'run_api_server'):
+                logger.info("main 모듈의 run_api_server 함수 사용")
                 asyncio.run(main.run_api_server())
             else:
-                logger.error("main 모듈에 run_api_server 함수가 없습니다.")
+                # 직접 API 서버 실행
+                logger.info("API 서버 직접 실행 (main 모듈의 run_api_server 함수 없음)")
+                api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
+                asyncio.run(api_server.run())
         except Exception as e:
             logger.error(f"API 서버 실행 중 오류 발생: {str(e)}")
     
     def run_web_server(self):
         try:
             logger.info("웹 서버 시작 중...")
+            # main 모듈 사용 여부 확인
             if hasattr(main, 'run_web_server'):
+                logger.info("main 모듈의 run_web_server 함수 사용")
                 asyncio.run(main.run_web_server())
             else:
-                logger.error("main 모듈에 run_web_server 함수가 없습니다.")
+                # 직접 웹 서버 실행
+                logger.info("웹 서버 직접 실행 (main 모듈의 run_web_server 함수 없음)")
+                web_server = UvicornServer(app="web_server:app", host="0.0.0.0", port=3000)
+                asyncio.run(web_server.run())
         except Exception as e:
             logger.error(f"웹 서버 실행 중 오류 발생: {str(e)}")
     

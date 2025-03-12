@@ -192,5 +192,5 @@ async def run_all():
         run_web_server()
     )
 
-if __name__ == "__main__":
-    asyncio.run(run_all())
+# if __name__ == "__main__":
+#     asyncio.run(run_all())
