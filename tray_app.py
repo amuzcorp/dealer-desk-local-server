@@ -11,41 +11,131 @@ from PIL import Image
 import pystray
 from pystray import MenuItem as item
 
-# PyInstaller 관련 설정
+# 실행 환경 설정
 if getattr(sys, 'frozen', False):
     # PyInstaller로 빌드된 실행 파일인 경우
     application_path = sys._MEIPASS
     
+    print(f"PyInstaller 환경에서 실행 중: {application_path}")
+    
+    # _internal 디렉토리 경로 계산 (여러 방법으로 시도)
+    internal_path = None
+    
+    # 1. 환경 변수에서 확인
+    if "INTERNAL_DIR" in os.environ and os.path.exists(os.environ["INTERNAL_DIR"]):
+        internal_path = os.environ["INTERNAL_DIR"]
+        print(f"환경 변수에서 _internal 경로 발견: {internal_path}")
+    
+    # 2. application_path 내에서 확인
+    elif os.path.exists(os.path.join(application_path, "_internal")):
+        internal_path = os.path.join(application_path, "_internal")
+        print(f"application_path 내에서 _internal 경로 발견: {internal_path}")
+    
+    # 3. 실행 파일 위치에서 확인
+    else:
+        exe_dir = os.path.dirname(sys.executable)
+        potential_internal = os.path.join(exe_dir, "_internal")
+        
+        if os.path.exists(potential_internal):
+            internal_path = potential_internal
+            print(f"실행 파일 위치에서 _internal 경로 발견: {internal_path}")
+        else:
+            # 4. 없으면 실행 파일 위치에 생성
+            try:
+                os.makedirs(potential_internal, exist_ok=True)
+                internal_path = potential_internal
+                print(f"_internal 디렉토리를 생성했습니다: {internal_path}")
+            except Exception as e:
+                print(f"_internal 디렉토리 생성 실패: {str(e)}")
+                # 5. 최후의 수단으로 현재 작업 디렉토리에 생성
+                current_dir_internal = os.path.join(os.getcwd(), "_internal")
+                os.makedirs(current_dir_internal, exist_ok=True)
+                internal_path = current_dir_internal
+                print(f"현재 작업 디렉토리에 _internal 생성: {internal_path}")
+    
     # 필요한 모듈 경로 추가
-    if application_path not in sys.path:
-        sys.path.insert(0, application_path)
+    for path in [application_path, internal_path]:
+        if path and path not in sys.path:
+            sys.path.insert(0, path)
+    
+    # 모듈 검색 경로 출력 (디버깅용)
+    print("Python 모듈 검색 경로:")
+    for path in sys.path:
+        print(f"  - {path}")
     
     # importlib을 사용하여 동적으로 모듈 로드
     def load_module(module_name, module_path):
         try:
+            print(f"모듈 로드 시도: {module_name} (경로: {module_path})")
+            
+            if not os.path.exists(module_path):
+                print(f"모듈 파일이 존재하지 않습니다: {module_path}")
+                
+                # 다른 경로에서 찾아보기
+                for search_path in sys.path:
+                    alt_path = os.path.join(search_path, f"{module_name}.py")
+                    if os.path.exists(alt_path):
+                        print(f"대체 경로에서 모듈 발견: {alt_path}")
+                        module_path = alt_path
+                        break
+            
             spec = importlib.util.spec_from_file_location(module_name, module_path)
             if spec:
                 module = importlib.util.module_from_spec(spec)
-                spec.loader.exec_module(module)
                 sys.modules[module_name] = module
+                spec.loader.exec_module(module)
+                print(f"모듈 {module_name} 로드 성공")
                 return module
             else:
                 print(f"모듈 {module_name}의 spec을 찾을 수 없습니다. 경로: {module_path}")
+                
+                # 직접 import 시도
+                try:
+                    print(f"{module_name} 모듈을 importlib.import_module로 시도")
+                    import importlib
+                    return importlib.import_module(module_name)
+                except Exception as e:
+                    print(f"직접 import 실패: {str(e)}")
+                
                 return None
         except Exception as e:
             print(f"모듈 {module_name} 로드 중 오류 발생: {str(e)}")
             return None
     
-    # 필요한 모듈들을 동적으로 로드
-    main_module_path = os.path.join(application_path, "main.py")
-    main = load_module("main", main_module_path)
+    # main 모듈 로드 시도 (여러 경로에서)
+    main = None
+    possible_paths = [
+        os.path.join(application_path, "main.py"),
+        os.path.join(internal_path, "main.py"),
+        os.path.join(os.path.dirname(sys.executable), "main.py"),
+        os.path.join(os.getcwd(), "main.py")
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            print(f"main.py 발견: {path}")
+            main = load_module("main", path)
+            if main:
+                break
+    
+    if not main:
+        print("main 모듈을 로드할 수 없습니다. 응용 프로그램이 제대로 작동하지 않을 수 있습니다.")
 else:
     # 일반 Python 스크립트로 실행되는 경우
     application_path = os.path.dirname(os.path.abspath(__file__))
-    import main
+    internal_path = os.path.join(application_path, "_internal")
+    if os.path.exists(internal_path):
+        if internal_path not in sys.path:
+            sys.path.insert(0, internal_path)
+    try:
+        import main
+    except ImportError:
+        print("main 모듈을 가져올 수 없습니다.")
+        sys.exit(1)
 
 # 로깅 설정
-log_file = os.path.join(application_path, "dealer_desk_tray.log") if getattr(sys, 'frozen', False) else "dealer_desk_tray.log"
+log_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+log_file = os.path.join(log_dir, "dealer_desk_tray.log")
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -66,16 +156,36 @@ class DealerDeskTrayApp:
         
     def setup_icon(self):
         # 아이콘 파일 경로 설정 (PyInstaller로 빌드 시 임시 경로 고려)
-        icon_path = os.path.join(application_path, "app_icon.ico")
+        icon_paths = [
+            os.path.join(application_path, "app_icon.ico"),
+            os.path.join(os.path.dirname(sys.executable), "app_icon.ico")
+        ]
+        
+        if internal_path:
+            icon_paths.append(os.path.join(internal_path, "app_icon.ico"))
+            
+        if getattr(sys, 'frozen', False) and hasattr(sys, "_MEIPASS"):
+            icon_paths.append(os.path.join(sys._MEIPASS, "app_icon.ico"))
+            if os.path.exists(os.path.join(sys._MEIPASS, "_internal")):
+                icon_paths.append(os.path.join(sys._MEIPASS, "_internal", "app_icon.ico"))
+        
+        # 모든 가능한 경로에서 아이콘 찾기
+        icon_image = None
+        for icon_path in icon_paths:
+            if os.path.exists(icon_path):
+                logger.info(f"아이콘 파일 발견: {icon_path}")
+                try:
+                    icon_image = Image.open(icon_path)
+                    break
+                except Exception as e:
+                    logger.error(f"아이콘 파일 열기 실패: {str(e)}")
+        
+        # 아이콘을 찾지 못한 경우 간단한 이미지 생성
+        if icon_image is None:
+            logger.warning("아이콘 파일을 찾을 수 없어 기본 이미지를 생성합니다.")
+            icon_image = Image.new('RGB', (64, 64), color=(66, 133, 244))
         
         try:
-            # 아이콘 파일이 존재하는 경우 사용
-            if os.path.exists(icon_path):
-                icon_image = Image.open(icon_path)
-            else:
-                # 존재하지 않으면 간단한 이미지 생성
-                icon_image = Image.new('RGB', (64, 64), color=(66, 133, 244))
-                
             # 트레이 아이콘 및 메뉴 설정
             self.icon = pystray.Icon(
                 "dealer_desk",
@@ -84,7 +194,7 @@ class DealerDeskTrayApp:
                 menu=self.create_menu()
             )
         except Exception as e:
-            logger.error(f"아이콘 설정 중 오류 발생: {str(e)}")
+            logger.error(f"트레이 아이콘 생성 중 오류 발생: {str(e)}")
             # 오류 발생 시 기본 이미지 사용
             icon_image = Image.new('RGB', (64, 64), color=(66, 133, 244))
             self.icon = pystray.Icon(
@@ -127,14 +237,20 @@ class DealerDeskTrayApp:
     def run_api_server(self):
         try:
             logger.info("API 서버 시작 중...")
-            asyncio.run(main.run_api_server())
+            if hasattr(main, 'run_api_server'):
+                asyncio.run(main.run_api_server())
+            else:
+                logger.error("main 모듈에 run_api_server 함수가 없습니다.")
         except Exception as e:
             logger.error(f"API 서버 실행 중 오류 발생: {str(e)}")
     
     def run_web_server(self):
         try:
             logger.info("웹 서버 시작 중...")
-            asyncio.run(main.run_web_server())
+            if hasattr(main, 'run_web_server'):
+                asyncio.run(main.run_web_server())
+            else:
+                logger.error("main 모듈에 run_web_server 함수가 없습니다.")
         except Exception as e:
             logger.error(f"웹 서버 실행 중 오류 발생: {str(e)}")
     
@@ -188,6 +304,25 @@ class DealerDeskTrayApp:
         logger.info("딜러 데스크 트레이 애플리케이션 시작")
         logger.info(f"작업 디렉토리: {os.getcwd()}")
         logger.info(f"애플리케이션 경로: {application_path}")
+        
+        if getattr(sys, 'frozen', False):
+            # 실행 환경 정보 로깅
+            logger.info(f"PyInstaller로 빌드된 실행 파일 모드")
+            if hasattr(sys, "_MEIPASS"):
+                logger.info(f"sys._MEIPASS: {sys._MEIPASS}")
+            
+            # _internal 디렉토리 정보 로깅
+            if internal_path and os.path.exists(internal_path):
+                logger.info(f"_internal 디렉토리 발견: {internal_path}")
+                logger.info("_internal 디렉토리 내용:")
+                try:
+                    for item in os.listdir(internal_path):
+                        logger.info(f"  - {item}")
+                except Exception as e:
+                    logger.error(f"_internal 디렉토리 내용 확인 중 오류: {str(e)}")
+            else:
+                logger.warning(f"_internal 디렉토리를 찾을 수 없거나 비어 있습니다: {internal_path}")
+        
         self.icon.run()
 
 if __name__ == "__main__":

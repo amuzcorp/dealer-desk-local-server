@@ -29,9 +29,27 @@ python build_windows.py
 
 빌드가 완료되면 `dist/DealerDesk` 디렉토리에 DealerDesk.exe 파일이 생성됩니다.
 
+### 트레이 애플리케이션 실행하기
+
+#### 방법 1: 실행 파일 직접 실행
+
+```bash
+dist/DealerDesk/DealerDesk.exe
+```
+
+#### 방법 2: 런처 스크립트 사용 (권장)
+
+_internal 디렉토리 문제가 발생한다면 런처 스크립트를 통해 실행하는 것을 권장합니다:
+
+```bash
+python run_dealerdesk.py
+```
+
+이 스크립트는 _internal 디렉토리의 존재를 확인하고, 필요하면 자동으로 생성하여 필요한 파일을 복사합니다.
+
 ### 트레이 애플리케이션 사용 방법
 
-1. `DealerDesk.exe` 파일을 실행합니다.
+1. 위 방법 중 하나로 애플리케이션을 실행합니다.
 2. 시스템 트레이(작업 표시줄 우측 알림 영역)에 아이콘이 나타납니다.
 3. 트레이 아이콘을 클릭하면 메뉴가 표시됩니다:
    - `서버 시작`: API 서버와 웹 서버를 시작하고 웹 브라우저에서 인터페이스를 엽니다.
@@ -54,6 +72,25 @@ python tray_app.py
 ```bash
 python main.py
 ```
+
+## _internal 디렉토리 문제 해결
+
+빌드 후 "_internal 디렉토리가 누락되었습니다" 오류가 발생하는 경우 다음 방법으로 해결할 수 있습니다:
+
+1. **런처 스크립트 사용**: `python run_dealerdesk.py` 명령으로 실행하면 자동으로 필요한 _internal 디렉토리를 생성하고 파일을 복사합니다.
+
+2. **수동으로 디렉토리 생성**: 다음 단계로 수동 설정할 수 있습니다:
+   ```
+   mkdir -p dist/DealerDesk/_internal
+   cp main.py web_server.py database.py schemas.py models.py auth_manager.py central_socket.py app_icon.ico dist/DealerDesk/_internal/
+   cp -r app databases Controllers dist/DealerDesk/_internal/
+   ```
+
+3. **환경 변수 설정**: `INTERNAL_DIR` 환경 변수를 설정하여 _internal 디렉토리 위치를 지정할 수 있습니다:
+   ```
+   set INTERNAL_DIR=C:\path\to\your\_internal
+   dist\DealerDesk\DealerDesk.exe
+   ```
 
 ## 서버 정보
 
@@ -80,10 +117,13 @@ API 서버는 FastAPI를 기반으로 개발되었으며, 다음과 같은 기�
 - **서버가 시작되지 않는 경우**: `dealer_desk_tray.log` 파일을 확인하여 오류 메시지를 확인하세요.
 - **포트 충돌**: 401번 또는 3000번 포트가 이미 사용 중인 경우 서버가 시작되지 않을 수 있습니다. 다른 프로그램을 종료하거나 포트 설정을 변경하세요.
 - **트레이 아이콘이 보이지 않는 경우**: 작업 표시줄의 숨겨진 아이콘을 확인하거나, 애플리케이션을 재시작하세요.
+- **_internal 디렉토리 문제**: 위의 "_internal 디렉토리 문제 해결" 섹션을 참조하세요.
 
 ## 로그 확인
 
-애플리케이션 로그는 `dealer_desk_tray.log` 파일에서 확인할 수 있습니다.
+애플리케이션 로그는 다음 위치에서 확인할 수 있습니다:
+- 트레이 앱 로그: `dealer_desk_tray.log`
+- 런처 로그: `dealerdesk_launcher.log`
 
 ## 개요
 딜러 데스크 로컬 서버는 매장별 데이터를 관리하고 중앙 서버와 통신하는 로컬 서버입니다.
