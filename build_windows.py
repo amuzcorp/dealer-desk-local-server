@@ -8,7 +8,7 @@ import ctypes
 import stat
 
 def is_admin():
-    """현재 프로세스가 관리자 권한으로 실행 중인지 확인"""
+    """Windows에서 관리자 권한 확인"""
     try:
         return ctypes.windll.shell32.IsUserAnAdmin() != 0
     except:
@@ -28,7 +28,7 @@ def force_delete(file_path):
         return False
 
 def kill_processes_by_name(process_names):
-    """지정된 이름의 프로세스 종료"""
+    """지정된 이름의 프로세스 종료 (Windows)"""
     for name in process_names:
         try:
             subprocess.run(f"taskkill /f /im {name}", shell=True, check=False)
@@ -72,6 +72,24 @@ def wait_for_user_confirmation(message="계속하려면 아무 키나 누르세�
     print(message)
     input()
 
+def create_icon_file():
+    """간단한 아이콘 파일이 없는 경우 생성"""
+    if not os.path.exists("app_icon.ico"):
+        try:
+            from PIL import Image
+            
+            print("아이콘 파일 생성 중...")
+            # 간단한 파란색 아이콘 생성
+            img = Image.new('RGB', (256, 256), color=(66, 133, 244))
+            img.save('app_icon.png')
+            
+            # .ico 파일로 변환
+            img.save('app_icon.ico')
+            print("아이콘 파일이 생성되었습니다.")
+        except Exception as e:
+            print(f"아이콘 생성 중 오류 발생: {str(e)}")
+            print("기본 아이콘으로 계속 진행합니다.")
+
 def build_windows_executable():
     print("\n" + "="*80)
     print("Windows 실행 파일 빌드 시작...")
@@ -87,7 +105,7 @@ def build_windows_executable():
     print("빌드 전 관련 프로세스 종료 중...")
     kill_processes_by_name([
         "DealerDesk.exe",
-        "uvicorn.exe"
+        "uvicorn.exe",
     ])
     
     # 잠시 대기하여 프로세스가 완전히 종료되도록 함
@@ -109,7 +127,7 @@ def build_windows_executable():
         "pyinstaller",
         "--name=DealerDesk",
         "--windowed",  # GUI 애플리케이션 (콘솔 창 없음)
-        "--icon=app_icon.ico",  # 아이콘 파일
+        "--icon=app_icon.ico",  # Windows 아이콘 파일
         "--workpath=" + work_dir,  # 작업 디렉토리 명시적 지정
         "--noconfirm",  # 확인 없이 진행
         "--clean",  # 빌드 전 정리
@@ -218,6 +236,9 @@ def build_windows_executable():
     # _internal 디렉토리 확인
     check_internal_dir(dist_dir)
     
+    # 관리자 권한으로 실행하는 배치 파일 생성
+    create_batch_launcher(dist_dir)
+    
     print("\n" + "="*80)
     print("빌드 완료!")
     print("실행 파일 위치: dist/DealerDesk/DealerDesk.exe")
@@ -295,33 +316,15 @@ def check_internal_dir(dist_dir):
         except Exception as e:
             print(f"_internal 디렉토리 내용 확인 중 오류: {str(e)}")
 
-def create_icon_file():
-    """간단한 아이콘 파일이 없는 경우 생성"""
-    if not os.path.exists("app_icon.ico"):
-        try:
-            from PIL import Image
-            
-            print("아이콘 파일 생성 중...")
-            # 간단한 파란색 아이콘 생성
-            img = Image.new('RGB', (256, 256), color=(66, 133, 244))
-            img.save('app_icon.png')
-            
-            # .ico 파일로 변환
-            img.save('app_icon.ico')
-            print("아이콘 파일이 생성되었습니다.")
-        except Exception as e:
-            print(f"아이콘 생성 중 오류 발생: {str(e)}")
-            print("기본 아이콘으로 계속 진행합니다.")
-
 def create_readme_file(dist_dir):
     """배포 디렉토리에 README 파일 생성"""
     readme_path = os.path.join(dist_dir, "README.txt")
     try:
         with open(readme_path, "w", encoding="utf-8") as f:
-            f.write("""딜러 데스크 트레이 애플리케이션
+            f.write("""딜러 데스크 트레이 애플리케이션 (Windows 버전)
 
 사용 방법:
-1. DealerDesk.exe 파일을 실행합니다.
+1. DealerDesk.exe 파일을 실행합니다. (관리자 권한이 필요할 수 있습니다)
 2. 시스템 트레이에 아이콘이 나타납니다.
 3. 트레이 아이콘을 클릭하면 메뉴가 표시됩니다.
 4. '서버 시작'을 선택하여 서버를 실행하고 웹 인터페이스를 엽니다.
@@ -331,11 +334,11 @@ def create_readme_file(dist_dir):
 8. '종료'를 선택하여 애플리케이션을 종료합니다.
 
 문제 해결:
-- 권한 오류가 발생한다면 관리자 권한으로 실행해보세요.
+- 접근 거부 오류가 발생한다면 Run_As_Admin.bat 파일을 사용하여 관리자 권한으로 실행하세요.
 - 서버 시작 문제는 로그 파일을 확인하세요.
-- _internal 디렉토리 접근 문제가 있으면 애플리케이션을 종료하고 다시 실행하세요.
+- Windows 보안 경고가 표시될 경우, '추가 정보'를 클릭한 다음 '실행'을 선택하세요.
 
-참고: 이 애플리케이션은 Python 3.13.2를 기반으로 빌드되었습니다.
+참고: 이 애플리케이션은 Python 3.13을 기반으로 빌드되었습니다.
 """)
         print(f"README 파일이 생성되었습니다: {readme_path}")
     except Exception as e:
@@ -358,8 +361,6 @@ exit
 if __name__ == "__main__":
     try:
         build_windows_executable()
-        # 관리자 권한으로 실행하는 배치 파일 생성
-        create_batch_launcher(os.path.join("dist", "DealerDesk"))
     except Exception as e:
         print(f"빌드 중 예상치 못한 오류 발생: {str(e)}")
         traceback.print_exc()
