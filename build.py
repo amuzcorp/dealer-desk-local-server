@@ -16,8 +16,6 @@ def build_exe():
         '--onefile',
         '--noconsole',
         '--icon=NONE',
-        '--add-data=templates:templates',  # templates 폴더가 있는 경우
-        '--add-data=static:static',        # static 폴더가 있는 경우
         '--hidden-import=uvicorn.logging',
         '--hidden-import=uvicorn.loops',
         '--hidden-import=uvicorn.loops.auto',
@@ -29,15 +27,19 @@ def build_exe():
         '--hidden-import=uvicorn.lifespan',
         '--hidden-import=uvicorn.lifespan.on',
         '--hidden-import=fastapi',
+        '--hidden-import=requests'
         '--hidden-import=sqlalchemy',
+        '--hidden-import=cryptography'
         '--collect-all=fastapi',
         '--collect-all=sqlalchemy',
+        '--collect-all=cryptography'
     ]
     
     # 모든 Python 파일을 hidden-import로 추가
     for file in python_files:
         if file != 'main.py' and file != 'build.py':
             module_name = os.path.splitext(file)[0]
+            print(f"modeule_name : {module_name}")
             options.append(f'--hidden-import={module_name}')
     
     # PyInstaller 실행
