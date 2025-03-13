@@ -78,9 +78,11 @@ async def get_point_history_by_user_id(user_id: int):
         point_history_records = db.query(models.PointHistoryData).filter(
             models.PointHistoryData.customer_id == user_id
         ).order_by(models.PointHistoryData.created_at.desc()).all()
+        print(f"point_history_records : {len(point_history_records)}")
         
         # 리스트 컴프리헨션으로 변환 성능 향상
         point_history_list = [record.to_json() for record in point_history_records]
+        print(f"point_history_list : {len(point_history_list)}")
         
         return JSONResponse(
             content={"response": 200, "message": "포인트 내역 조회 성공", "data": point_history_list},
@@ -127,13 +129,13 @@ async def get_total_point_by_user_id(user_id: int):
     db = get_db_direct()
     try:
         # 쿼리 최적화 - 합계 계산을 DB에서 처리 
-        total_amount_records = db.query(models.PointHistoryData).filter(
+        total_amount_records : list[models.PointHistoryData] = db.query(models.PointHistoryData).filter(
             models.PointHistoryData.customer_id == user_id,
             models.PointHistoryData.is_increase == True,
             models.PointHistoryData.available_amount > 0
         ).all()
          
-        total_amount = sum(point.available_amount for point in total_amount_records)
+        total_amount = sum(point.amount for point in total_amount_records)
         print(f"total_point : {total_amount}")
         return JSONResponse(
             content={"response": 200, "message": "총 포인트 조회 성공", "data": total_amount},

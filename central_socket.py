@@ -32,7 +32,7 @@ ssl_context.verify_mode = ssl.CERT_NONE
 class MessageQueueManager:
     """메시지 큐를 관리하는 클래스"""
     def __init__(self, store_path: str = None):
-        self.store_path = store_path or os.path.join(os.path.expanduser('~'), '.dealer_desk', 'message_queue')
+        self.store_path = store_path or os.path.join(os.path.expanduser('~'), '.dealer_desk', f'message_queue')
         self.ensure_store_directory()
         
     def ensure_store_directory(self):
@@ -543,7 +543,7 @@ class ReverbTestController:
                             customer_id=point_history_data['customer_id'],
                             uuid=str(uuid.uuid4()),
                             reason=reason,
-                            amount=point_history_data['point'],
+                            amount=point_history_data['amount'],
                             expire_at=datetime.now(),
                             is_increase=False
                         )
