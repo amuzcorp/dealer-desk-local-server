@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
-  <g id="ic_play_green" transform="translate(-1710 -704)">
-    <g id="타원_175" data-name="타원 175" transform="translate(1710 704)" fill="none" stroke="#18ac8d" stroke-width="1">
-      <circle cx="24" cy="24" r="24" stroke="none"/>
-      <circle cx="24" cy="24" r="23.5" fill="none"/>
-    </g>
-    <path id="패스_37102" data-name="패스 37102" d="M6,23.906V4.018A1.213,1.213,0,0,1,7.856,2.989l15.91,9.944a1.213,1.213,0,0,1,0,2.058L7.856,24.935A1.213,1.213,0,0,1,6,23.906Z" transform="translate(1721.108 714.038)" fill="#18ac8d"/>
-  </g>
-</svg>
