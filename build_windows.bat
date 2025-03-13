@@ -1,31 +1,31 @@
 @echo off
-echo Dealer Desk Local Server 빌드 스크립트 (Windows용)
+echo Dealer Desk Local Server Build Script (Windows)
 echo ======================================================
 
-rem 필요한 디렉토리가 없는 경우 생성
+rem Create necessary directories if they don't exist
 if not exist "build" mkdir build
 if not exist "dist" mkdir dist
 
-rem 파이썬 가상환경 설정
-echo 가상환경 설정 중...
+rem Setup Python virtual environment
+echo Setting up virtual environment...
 python -m venv build\venv
 call build\venv\Scripts\activate.bat
 
-rem 의존성 설치
-echo 필요한 패키지 설치 중...
+rem Install dependencies
+echo Installing required packages...
 pip install -r requirement.txt
 pip install pyinstaller pystray pillow
 
-rem 앱 아이콘 생성 스크립트 실행
+rem Run app icon creation script
 if not exist "app_icon.png" (
-    echo 앱 아이콘 생성 중...
+    echo Creating app icon...
     python create_app_icon.py
 )
 
-rem 애플리케이션 빌드
-echo PyInstaller로 애플리케이션 빌드 중...
+rem Build application
+echo Building with PyInstaller...
 
-rem tray_app.py가 없으면 생성
+rem Create tray_app.py if it doesn't exist
 if not exist "tray_app.py" (
     echo import os > tray_app.py
     echo import sys >> tray_app.py
@@ -40,13 +40,13 @@ if not exist "tray_app.py" (
     echo from tkinter import messagebox >> tray_app.py
     echo. >> tray_app.py
     echo def resource_path^(relative_path^): >> tray_app.py
-    echo     """ 리소스 경로 가져오기 함수 """ >> tray_app.py
+    echo     """ Get resource path function """ >> tray_app.py
     echo     if hasattr^(sys, '_MEIPASS'^): >> tray_app.py
     echo         return os.path.join^(sys._MEIPASS, relative_path^) >> tray_app.py
     echo     return os.path.join^(os.path.abspath^("."), relative_path^) >> tray_app.py
     echo. >> tray_app.py
     echo def run_server^(^): >> tray_app.py
-    echo     """ 서버 실행 함수 """ >> tray_app.py
+    echo     """ Server execution function """ >> tray_app.py
     echo     try: >> tray_app.py
     echo         import main >> tray_app.py
     echo         asyncio.run^(main.run_all^(^)^) >> tray_app.py
@@ -54,60 +54,60 @@ if not exist "tray_app.py" (
     echo         traceback.print_exc^(^) >> tray_app.py
     echo         root = tk.Tk^(^) >> tray_app.py
     echo         root.withdraw^(^) >> tray_app.py
-    echo         messagebox.showerror^("오류", f"서버 실행 중 오류가 발생했습니다: {str^(e^)}") >> tray_app.py
+    echo         messagebox.showerror^("Error", f"Error occurred while running the server: {str^(e^)}") >> tray_app.py
     echo         root.destroy^(^) >> tray_app.py
     echo         sys.exit^(1^) >> tray_app.py
     echo. >> tray_app.py
     echo def on_clicked^(icon, item^): >> tray_app.py
-    echo     """ 트레이 아이콘 클릭 이벤트 처리 """ >> tray_app.py
-    echo     if str^(item^) == "웹 페이지 열기": >> tray_app.py
+    echo     """ Tray icon click event handler """ >> tray_app.py
+    echo     if str^(item^) == "Open Web Page": >> tray_app.py
     echo         webbrowser.open^("http://localhost:3000") >> tray_app.py
-    echo     elif str^(item^) == "종료": >> tray_app.py
+    echo     elif str^(item^) == "Exit": >> tray_app.py
     echo         icon.stop^(^) >> tray_app.py
     echo         os._exit^(0^) >> tray_app.py
     echo. >> tray_app.py
     echo def setup_tray^(^): >> tray_app.py
-    echo     """ 트레이 아이콘 설정 """ >> tray_app.py
+    echo     """ Setup tray icon """ >> tray_app.py
     echo     try: >> tray_app.py
     echo         icon_path = resource_path^("app_icon.png") >> tray_app.py
     echo         image = Image.open^(icon_path^) >> tray_app.py
-    echo         menu = ^(pystray.MenuItem^('웹 페이지 열기', on_clicked^), >> tray_app.py
-    echo                pystray.MenuItem^('종료', on_clicked^)^) >> tray_app.py
-    echo         icon = pystray.Icon^("dealer_desk", image, "딜러 데스크", menu^) >> tray_app.py
+    echo         menu = ^(pystray.MenuItem^('Open Web Page', on_clicked^), >> tray_app.py
+    echo                pystray.MenuItem^('Exit', on_clicked^)^) >> tray_app.py
+    echo         icon = pystray.Icon^("dealer_desk", image, "Dealer Desk", menu^) >> tray_app.py
     echo         return icon >> tray_app.py
     echo     except Exception as e: >> tray_app.py
     echo         traceback.print_exc^(^) >> tray_app.py
-    echo         print^(f"트레이 아이콘 설정 중 오류 발생: {str^(e^)}") >> tray_app.py
+    echo         print^(f"Error setting up tray icon: {str^(e^)}") >> tray_app.py
     echo         return None >> tray_app.py
     echo. >> tray_app.py
     echo if __name__ == "__main__": >> tray_app.py
-    echo     # 서버 스레드 시작 >> tray_app.py
+    echo     # Start server thread >> tray_app.py
     echo     server_thread = threading.Thread^(target=run_server, daemon=True^) >> tray_app.py
     echo     server_thread.start^(^) >> tray_app.py
-    echo     # 트레이 아이콘 설정 및 실행 >> tray_app.py
+    echo     # Setup and run tray icon >> tray_app.py
     echo     icon = setup_tray^(^) >> tray_app.py
     echo     if icon: >> tray_app.py
-    echo         # 웹 페이지 자동 열기 >> tray_app.py
+    echo         # Auto-open web page >> tray_app.py
     echo         threading.Timer^(2, lambda: webbrowser.open^("http://localhost:3000")^).start^(^) >> tray_app.py
-    echo         # 트레이 아이콘 실행 >> tray_app.py
+    echo         # Run tray icon >> tray_app.py
     echo         icon.run^(^) >> tray_app.py
     echo     else: >> tray_app.py
-    echo         # 트레이 아이콘 설정 실패 시 서버만 실행 >> tray_app.py
+    echo         # Run server only if tray icon setup fails >> tray_app.py
     echo         run_server^(^) >> tray_app.py
 )
 
-rem Controllers 디렉토리에 __init__.py 파일이 없으면 생성
+rem Create __init__.py in Controllers directory if it doesn't exist
 if not exist "Controllers\__init__.py" (
     type nul > Controllers\__init__.py
 )
 
-rem databases 디렉토리가 없으면 생성
+rem Create databases directory if it doesn't exist
 if not exist "databases" (
     mkdir databases
 )
 
-rem 빌드 명령 실행
-echo 패키징 명령 시작...
+rem Execute build command
+echo Starting packaging command...
 pyinstaller --clean --noconfirm --name "DealerDesk" ^
     --add-data "app_icon.png;." ^
     --add-data "app;app" ^
@@ -151,13 +151,13 @@ pyinstaller --clean --noconfirm --name "DealerDesk" ^
     tray_app.py
 
 echo.
-echo 빌드가 완료되었습니다.
-echo dist\DealerDesk 디렉토리에 실행 파일이 생성되었습니다.
+echo Build completed.
+echo Executable has been created in the dist\DealerDesk directory.
 
-rem 가상환경 비활성화
+rem Deactivate virtual environment
 call build\venv\Scripts\deactivate.bat
 
 echo.
 echo ======================================================
-echo 빌드를 시작하려면 아무 키나 누르세요...
+echo Press any key to start building...
 pause 
