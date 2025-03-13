@@ -324,7 +324,7 @@ async def create_rebuyin_purchase_data_by_user_id(user_id: int, game_id: int):
             game_id=game_id,
             uuid=str(uuid.uuid4()),
             purchased_at=datetime.now(),
-            item="REBUYIN",
+            item="BUYIN",
             payment_status="SUCCESS",
             status="SUCCESS",
             price=game.re_buy_in_price,

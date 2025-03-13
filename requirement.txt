@@ -1,4 +1,0 @@
-aiohttp
-SQLAlchemy
-uvicorn
-fastapi
