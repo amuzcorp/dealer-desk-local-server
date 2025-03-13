@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, Query
 from sqlalchemy import DateTime
@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from sse_starlette.sse import EventSourceResponse
 
 import json 
 import sys
@@ -60,7 +59,8 @@ async def get_purchase_data():
     finally:
         db.close()
     
-# 구매 데이터 컨트롤 - WAITING to PAYMENT_CHIP
+# 구매 데이터 컨트롤 - WAITING to SUCCESS
+# 결제 완료 처리(매장 결제)
 @router.get("/waiting-to-payment-chip/{purchase_id}")
 async def waiting_to_payment_chip(purchase_id: int):
     """구매 상태를 '결제 대기'에서 '칩 대기'로 변경"""
@@ -68,7 +68,7 @@ async def waiting_to_payment_chip(purchase_id: int):
     db = get_db_direct()
     try:
         # 구매 데이터 조회
-        purchase = db.query(models.PurchaseData).filter(models.PurchaseData.id == purchase_id).first()
+        purchase : models.PurchaseData = db.query(models.PurchaseData).filter(models.PurchaseData.id == purchase_id).first()
         if not purchase:
             return JSONResponse(
                 content={"response": 404, "message": "구매 데이터를 찾을 수 없습니다"},

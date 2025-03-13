@@ -100,10 +100,9 @@ async def get_current_point_by_user_id(user_id: int):
     db = get_db_direct()
     try:
         # 쿼리 최적화 - 합계 계산을 DB에서 처리
-        total_amount_records = db.query(models.PointHistoryData).filter(
+        total_amount_records : list[models.PointHistoryData] = db.query(models.PointHistoryData).filter(
             models.PointHistoryData.customer_id == user_id,
             models.PointHistoryData.is_expired == False,
-            models.PointHistoryData.is_increase == True,
             models.PointHistoryData.available_amount > 0
         ).all()
         

@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import StreamingResponse
-from sse_starlette.sse import EventSourceResponse
 
 import json 
 import sys

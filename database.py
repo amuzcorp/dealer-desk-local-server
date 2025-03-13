@@ -38,7 +38,7 @@ def get_current_store_id():
     global current_store_id
     if current_store_id is None:
         logger.warning("현재 선택된 매장이 없습니다. 기본 매장 ID를 사용합니다.")
-        return 1  # 기본 매장 ID
+        return 0  # 기본 매장 ID
     return current_store_id
 
 class DatabaseManager:

@@ -786,8 +786,9 @@ async def update_user_rebuy_in(game_id: int, user_id: int, db: Session = Depends
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
 
-@router.put("/update-user-rebuy-in-order")
-async def update_user_rebuy_in_order(game_id: int, user_id: int, db: Session = Depends(get_db)):
+@router.get("/update-user-rebuy-in-order")
+async def update_user_rebuy_in_order(game_id: int, user_id: int):
+    db = get_db_direct()
     game = db.query(models.GameData).filter(models.GameData.id == game_id).first()
     if not game:
         return JSONResponse(

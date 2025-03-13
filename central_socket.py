@@ -531,13 +531,13 @@ class ReverbTestController:
                         
                         # 한글 reason 처리 (이스케이프된 유니코드 문자열 디코딩)
                         reason = point_history_data['reason']
-                        try:
-                            # 이스케이프된 유니코드 문자열인 경우 디코딩
-                            if '\\u' in reason:
-                                reason = reason.encode().decode('unicode_escape')
-                            logger.info(f'처리된 포인트 사용 이유: {reason}')
-                        except Exception as e:
-                            logger.error(f'포인트 사용 이유 디코딩 중 오류: {e}')
+                        # try:
+                        #     # 이스케이프된 유니코드 문자열인 경우 디코딩
+                        #     if '\\u' in reason:
+                        #         reason = reason.decode('unicode_escape')
+                        #     logger.info(f'처리된 포인트 사용 이유: {reason}')
+                        # except Exception as e:
+                        #     logger.error(f'포인트 사용 이유 디코딩 중 오류: {e}')
                         
                         point_history_input_data = models.PointHistoryData(
                             customer_id=point_history_data['customer_id'],
@@ -547,8 +547,30 @@ class ReverbTestController:
                             expire_at=datetime.now(),
                             is_increase=False
                         )
-                        db = get_db_direct()
+                        
+                        db = get_db_direct() 
                         try:
+                            if(point_history_input_data.is_increase == False):
+                                # 가장 먼저 포인트 내역 조회 (is_increase가 True, customer_id가 같으며, expire_at이 지나지 않았고, available_amount가 0보다 큰 데이터)
+                                point_history_data : list[models.PointHistoryData] = db.query(models.PointHistoryData).filter(
+                                    models.PointHistoryData.customer_id == point_history_input_data.customer_id,
+                                    models.PointHistoryData.is_increase == True, 
+                                    models.PointHistoryData.is_expired == False,
+                                    models.PointHistoryData.available_amount > 0,
+                                    models.PointHistoryData.expire_at > datetime.now()
+                                ).order_by(models.PointHistoryData.expire_at.asc()).all()
+                                # 포인트 차람
+                                remain_used_amount = point_history_input_data.amount
+                                for point_history in point_history_data:
+                                    if(point_history.available_amount > remain_used_amount):
+                                        point_history.available_amount -= remain_used_amount
+                                        break
+                                    else:
+                                        remain_available_amount = point_history.available_amount
+                                        point_history.available_amount -= remain_available_amount
+                                        remain_used_amount -= remain_available_amount
+                                        
+                                        
                             db.add(point_history_input_data)
                             db.commit()
                             db.refresh(point_history_input_data)

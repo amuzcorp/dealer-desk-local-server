@@ -110,6 +110,8 @@ async def save_table(tables: List[schemas.TableData]):
                 db.refresh(table)
                 
             import main
+            for table in result:
+                table.game_id = None
             await main.socket_controller.save_tables(result)
             return JSONResponse(
                 content={"response": 200, "data": "테이블 저장 성공"},
