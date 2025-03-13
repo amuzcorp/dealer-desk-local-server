@@ -169,10 +169,6 @@ async def run_api_server():
     api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
     await api_server.run()
 
-async def run_web_server():
-    web_server = UvicornServer(app="web_server:app", host="0.0.0.0", port=3000)
-    await web_server.run()
-
 async def run_all():
     # 시그널 핸들러 설정
     def signal_handler(signum, frame):
@@ -189,7 +185,6 @@ async def run_all():
     
     await asyncio.gather(
         run_api_server(),
-        run_web_server()
     )
 
 if __name__ == "__main__":
