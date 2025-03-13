@@ -36,11 +36,13 @@ def build_exe():
     ]
     
     # 모든 Python 파일을 hidden-import로 추가
-    for file in python_files:
-        if file != 'main.py' and file != 'build.py':
-            module_name = os.path.splitext(file)[0]
-            print(f"modeule_name : {module_name}")
-            options.append(f'--hidden-import={module_name}')
+    # 폴더 순회
+    for root, dirs, files in os.walk('.'):
+        for file in files:
+            if file.endswith('.py'):
+                module_name = os.path.splitext(file)[0]
+                if module_name != 'main.py' and module_name != 'build.py':
+                    options.append(f'--hidden-import={module_name}')
     
     # PyInstaller 실행
     PyInstaller.__main__.run(options)
