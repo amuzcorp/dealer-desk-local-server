@@ -1,4 +1,60 @@
-# Dealer Desk Local Server
+# 딜러 데스크 API 서버
+
+윈도우 환경에서 실행 가능한 딜러 데스크 API 서버입니다.
+
+## 시스템 요구사항
+
+- Windows 10 이상
+- Python 3.8 이상
+
+## 빠른 시작 가이드
+
+### 개발자를 위한 설치 및 실행 방법
+
+1. 이 저장소를 복제하세요:
+```
+git clone <저장소 URL>
+cd dealer-desk-local-server
+```
+
+2. `run_dev.bat` 파일을 실행하세요:
+   - 자동으로 필요한 패키지를 설치하고 서버를 시작합니다.
+   - 브라우저가 자동으로 열리고 http://localhost:3000으로 접속합니다.
+
+### 배포용 버전 빌드 방법
+
+1. `install_win.bat` 파일을 실행하세요:
+   - 필요한 패키지를 설치하고 서버를 빌드합니다.
+   - 빌드 결과물은 `dist/DealerDeskServer` 폴더에 생성됩니다.
+
+2. 빌드 완료 후 `dist/DealerDeskServer` 폴더에서 `start_server.bat` 파일을 실행하세요:
+   - 서버가 시작되고 브라우저가 자동으로 열립니다.
+
+## 서버 정보
+
+- API 서버는 401번 포트에서 실행됩니다.
+- 웹 서버는 3000번 포트에서 실행됩니다.
+- 서버 상태 확인: http://localhost:401/health
+- API 문서: http://localhost:401/docs
+
+## 로그인 정보
+
+- 로그인 API: http://localhost:401/login
+- 매장 선택 API: http://localhost:401/select-store
+
+## 문제 해결
+
+1. 서버가 실행되지 않는 경우:
+   - Python이 올바르게 설치되어 있는지 확인하세요.
+   - `pip install -r requirements.txt`로 필요한 패키지가 설치되어 있는지 확인하세요.
+
+2. 포트 충돌 문제:
+   - 다른 애플리케이션이 401번 또는 3000번 포트를 사용 중인지 확인하세요.
+   - 필요한 경우 `main.py` 파일에서 포트 번호를 변경할 수 있습니다.
+
+## 라이센스
+
+이 프로젝트는 비공개 라이센스로 배포됩니다.
 
 ## 개요
 딜러 데스크 로컬 서버는 매장별 데이터를 관리하고 중앙 서버와 통신하는 로컬 서버입니다.
