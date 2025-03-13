@@ -166,9 +166,14 @@ class UvicornServer:
         await self.server.serve()
 
 async def run_api_server():
-    api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
-    await api_server.run()
-
+    try:
+        api_server = UvicornServer(app="main:app", host="0.0.0.0", port=401)
+        await api_server.run()
+    except OSError as e:
+        if e.errno == 98 or e.errno == 10048:  # 포트가 이미 사용 중일 때의 에러 코드 (Linux: 98, Windows: 10048)
+            print("401 포트가 이미 사용 중입니다. 서버를 종료합니다.")
+            sys.exit(1)
+        raise e
 async def run_all():
     # 시그널 핸들러 설정
     def signal_handler(signum, frame):
