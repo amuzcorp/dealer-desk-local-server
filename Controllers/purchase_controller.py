@@ -197,8 +197,8 @@ async def get_purchase_data_by_game_id(game_id: int):
         db.close()
  
 @router.get("/get-purchase-data-by-date/{startTime}/{endTime}")
-async def get_purchase_data_by_date(startTime: str, endTime: str):
-    """날짜 범위로 구매 데이터 조회"""
+async def get_purchase_data_by_date(startTime: str, endTime: str, page: int = 1, page_size: int = 10):
+    """날짜 범위로 구매 데이터 조회 (페이지네이션 적용)"""
     # 직접 세션 가져오기
     db = get_db_direct()
     try:
@@ -206,16 +206,42 @@ async def get_purchase_data_by_date(startTime: str, endTime: str):
         start_date = datetime.fromisoformat(startTime.replace('Z', '+00:00'))
         end_date = datetime.fromisoformat(endTime.replace('Z', '+00:00'))
         
-        # 날짜 범위로 구매 데이터 조회
+        # 전체 데이터 개수 조회
+        total_count = db.query(models.PurchaseData).filter(
+            models.PurchaseData.purchased_at >= start_date,
+            models.PurchaseData.purchased_at <= end_date
+        ).count()
+        
+        # 총 페이지 수 계산
+        total_pages = (total_count + page_size - 1) // page_size
+        
+        # 날짜 범위로 구매 데이터 조회 (페이지네이션 적용)
         purchase_data = db.query(models.PurchaseData).filter(
             models.PurchaseData.purchased_at >= start_date
         ).filter(
             models.PurchaseData.purchased_at <= end_date
+        ).filter(
+            models.PurchaseData.status == "SUCCESS"
+        ).order_by(
+            models.PurchaseData.purchased_at.desc()
         ).all()
+        
+        # 페이지네이션 적용
+        purchase_data = purchase_data[(page - 1) * page_size:page * page_size]
         
         if not purchase_data:
             return JSONResponse(
-                content={"response": 201, "message": "해당 기간에 구매 데이터가 없습니다"},
+                content={
+                    "response": 201, 
+                    "message": "해당 기간에 구매 데이터가 없습니다",
+                    "pagination": {
+                        "total_count": 0,
+                        "total_pages": 0,
+                        "current_page": page,
+                        "page_size": page_size,
+                        "total_prize" : 0
+                    }
+                },
                 headers={"Content-Type": "application/json; charset=utf-8"}
             )
             
@@ -224,9 +250,24 @@ async def get_purchase_data_by_date(startTime: str, endTime: str):
         for purchase in purchase_data:
             purchase_json = purchase.to_json()
             result.append(purchase_json)
-            
+        
+        total_prize = 0
+        for purchase in purchase_data:
+            total_prize += purchase.price
+        
+        print("total_prize : ", total_prize) 
         return JSONResponse(
-            content={"response": 200, "data": result},
+            content={
+                "response": 200, 
+                "data": result,
+                "pagination": {
+                    "total_count": total_count,
+                    "total_pages": total_pages,
+                    "current_page": page,
+                    "page_size": page_size,
+                    "total_prize" : total_prize
+                }
+            },
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     except Exception as e:
@@ -236,7 +277,6 @@ async def get_purchase_data_by_date(startTime: str, endTime: str):
         )
     finally:
         db.close()
-        
 @router.put("/create-buyin-purchase-data-by-user-id/")
 async def create_buyin_purchase_data_by_user_id(user_id: int, game_id: int):
     """사용자별 구매 데이터 생성"""

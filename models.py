@@ -267,3 +267,23 @@ class PointHistoryData(Base):
             "is_increase": self.is_increase,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+class OpenClossData(Base):
+    __tablename__ = "open_closs_data"
+
+    id = Column(Integer, primary_key=True, index=True)
+    status = Column(String, default="OPEN")  # OPEN, CLOSE
+    operator_year = Column(Integer, default=0)
+    operator_month = Column(Integer, default=0)
+    operator_day = Column(Integer, default=0)
+    timestamp = Column(DateTime, default=datetime.now())
+
+    def to_json(self):
+        return {
+            "id": self.id,
+            "status": self.status,
+            "operator_year": self.operator_year,
+            "operator_month": self.operator_month,
+            "operator_day": self.operator_day,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None
+        }

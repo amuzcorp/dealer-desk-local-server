@@ -8,7 +8,7 @@ from central_socket import ReverbTestController
 import models, schemas, database
 import dataclasses
 import socket
-from Controllers import game_controller, purchase_controller, qr_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller, point_controller
+from Controllers import game_controller, operator_controller, purchase_controller, qr_controller, table_controller, device_controller, preset_controller, user_controller, awarding_controller, point_controller
 import sys
 import signal
 
@@ -40,6 +40,7 @@ app.include_router(user_controller.router)
 app.include_router(awarding_controller.router)
 app.include_router(point_controller.router)
 app.include_router(qr_controller.router)
+app.include_router(operator_controller.router)
 socket_controller: ReverbTestController = ReverbTestController()
 
 @app.get("/health")

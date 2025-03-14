@@ -273,8 +273,9 @@ async def connect_table_game_id(table_game_id: dict):
         table_connect_log.append(log_entry)
         
         # 게임 객체 업데이트
-        game.table_connect_log = table_connect_log
-        
+        db.query(models.GameData).filter(models.GameData.id == game_id).update({
+            models.GameData.table_connect_log: table_connect_log
+        })
         # 변경사항 저장
         db.commit()
         
