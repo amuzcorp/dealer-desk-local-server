@@ -199,6 +199,11 @@ async def get_purchase_data_by_game_id(game_id: int):
 @router.get("/get-purchase-data-by-date/{startTime}/{endTime}")
 async def get_purchase_data_by_date(startTime: str, endTime: str, page: int = 1, page_size: int = 10):
     """날짜 범위로 구매 데이터 조회 (페이지네이션 적용)"""
+    """
+        startTime과 endTime을 받아서, 
+        OperatorController에서 오픈 클로즈 상태를 확인하고, 
+        오픈 클로즈 상태에 따라 구매 데이터를 조회한다.
+    """
     # 직접 세션 가져오기
     db = get_db_direct()
     try:
@@ -271,6 +276,7 @@ async def get_purchase_data_by_date(startTime: str, endTime: str, page: int = 1,
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     except Exception as e:
+        print("error : ", e)
         return JSONResponse(
             content={"response": 500, "message": str(e)},
             headers={"Content-Type": "application/json; charset=utf-8"}

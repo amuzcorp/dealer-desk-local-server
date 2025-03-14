@@ -32,18 +32,18 @@ async def get_open_closs():
     
     if open_closs is None:
         return JSONResponse(
-            content={"response": 200 , "data": "closs"},
+            content={"response": 200 , "data": "CLOSE"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     
     if open_closs.status == "OPEN":
         return JSONResponse(
-            content={"response": 200, "data": "open"},
+            content={"response": 200, "data": "OPEN"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
     else:
         return JSONResponse(
-            content={"response": 200, "data": "closs"},
+            content={"response": 200, "data": "CLOSE"},
             headers={"Content-Type": "application/json; charset=utf-8"}
         )
 
@@ -78,14 +78,16 @@ async def post_open_closs():
             status = "CLOSE",
             operator_year = open_closs.operator_year,
             operator_month = open_closs.operator_month,
-            operator_day = open_closs.operator_day
+            operator_day = open_closs.operator_day,
+            timestamp = datetime.now()  
         )
     else:
         new_open_closs = models.OpenClossData(
             status = "OPEN",
             operator_year = datetime.now().year,
             operator_month = datetime.now().month,
-            operator_day = datetime.now().day
+            operator_day = datetime.now().day,
+            timestamp = datetime.now()
         )
         
     db.add(new_open_closs)
@@ -95,3 +97,12 @@ async def post_open_closs():
         content={"response": 200, "data": new_open_closs.to_json()},
         headers={"Content-Type": "application/json; charset=utf-8"}
     )
+
+
+async def get_last_open_data():
+    db : Session = get_db_direct()
+    open_closs:models.OpenClossData = db.query(models.OpenClossData).order_by(models.OpenClossData.id.desc()).first()
+    
+    print("open_closs : ", open_closs.to_json())
+    
+    return open_closs

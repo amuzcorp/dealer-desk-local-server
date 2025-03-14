@@ -18,7 +18,7 @@ import models
 # import app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from Controllers import device_controller, device_socket_manager, table_controller
+from Controllers import device_controller, device_socket_manager, table_controller, operator_controller
 import models
 import schemas
 from database import get_db, get_db_direct
@@ -148,12 +148,19 @@ async def create_game(preset_id: dict):
                 content={"response": 404, "message": "게임 프리셋을 찾을 수 없습니다"},
                 headers={"Content-Type": "application/json; charset=utf-8"}
             )
-            
+        
+        operator_data : models.OpenClossData = await operator_controller.get_last_open_data()
+        
+        open_date = operator_data.timestamp;
+        print("open_date : ", open_date)
+        
+        duflicate_games : List[models.GameData] = db.query(models.GameData).filter(models.GameData.game_start_time >= open_date).filter(models.GameData.title.like(f"%{preset.preset_name}%")).all()
+        gameName = f"{preset.preset_name} {len(duflicate_games)+1}부";
         
         # 새 게임 생성
         new_game = models.GameData(
             game_code=game_code,
-            title=preset.preset_name,
+            title=gameName,
             game_start_time=datetime.now(),
             game_calcul_time=datetime.now(),
             game_stop_time=datetime.now(),
